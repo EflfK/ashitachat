@@ -16,6 +16,13 @@ $lua = Get-Content -LiteralPath $addon -Raw
 $required = @(
     "addon.name = 'ashitachat'",
     "require('common')",
+    "require('imgui')",
+    "local TABS =",
+    "selected_tab = 'general'",
+    "search_buffer = T{ '' }",
+    "messages = {}",
+    "append_message(e)",
+    "render_chat_window()",
     "ashita.events.register('command'",
     "ashita.events.register('d3d_present'",
     "ashita.events.register('text_in'",

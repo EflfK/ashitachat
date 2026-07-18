@@ -6,12 +6,24 @@ Initial scope:
 
 - Keep behavior local to the client UI.
 - Do not send gameplay commands, automate actions, or inject packets.
-- Start with a reversible trial for suppressing native chat-log lines.
+- Provide a replacement chat window that can run alongside, then replace, the
+  native chat log.
 
 ## Current Trial
 
-This first version tests whether Ashita can suppress native chat-log lines and
-pin the legacy chat windows closed while chat input is not open.
+This version renders a draggable, resizable ImGui replacement chat window with
+four tabs:
+
+- General: all captured chat lines.
+- Combat Log: battle, casting, damage, and status-effect style lines.
+- Group: party and tell lines.
+- LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
+
+The window includes a search field and a bounded local buffer. It is passive UI:
+it only captures incoming chat text and renders it locally.
+
+The addon can also suppress native chat-log lines and pin the legacy chat
+windows closed while chat input is not open.
 
 The addon registers the Ashita v4 `text_in` event. When hiding is enabled, it
 blocks non-injected incoming text by setting `e.blocked = true`. Injected lines
@@ -48,6 +60,12 @@ Then load in game:
 /ashitachat hide
 /ashitachat show
 /ashitachat toggle
+/ashitachat ui
+/ashitachat clear
+/ashitachat tab general
+/ashitachat tab combat
+/ashitachat tab group
+/ashitachat tab lfg
 /ashitachat status
 /ashitachat help
 ```
