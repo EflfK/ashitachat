@@ -49,17 +49,20 @@ local COLORS = {
     empty = { 0.62, 0.62, 0.66, 1.00 },
 };
 
-local TABS = {
-    { key = 'general', label = 'General' },
-    { key = 'combat', label = 'Combat Log' },
-    { key = 'group', label = 'Group' },
-    { key = 'lfg', label = 'LFG' },
+local DEFAULT_TABS = {
+    { key = 'general', label = 'General', filters = { 'all' } },
+    { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
+    { key = 'group', label = 'Group', filters = { 'group' } },
+    { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
 };
 
-local TAB_BY_KEY = {};
-for _, tab in ipairs(TABS) do
-    TAB_BY_KEY[tab.key] = tab;
-end
+local VALID_FILTERS = {
+    all = true,
+    general = true,
+    combat = true,
+    group = true,
+    lfg = true,
+};
 
 local MODE_LABELS = {
     [1] = 'say',
@@ -104,6 +107,9 @@ local state = {
     hide_native = false,
     ui_visible = T{ true },
     selected_tab = 'general',
+    tabs = {},
+    tab_by_key = {},
+    config_error = nil,
     search_buffer = T{ '' },
     messages = {},
     message_seq = 0,
@@ -133,6 +139,230 @@ end
 
 local function buffer_set(buffer, value)
     buffer[1] = value or '';
+end
+
+local function normalize_key(value, fallback)
+    local key = trim_string(value):lower():gsub('%s+', '-'):gsub('[^a-z0-9_-]', '');
+    if (key == '') then
+        return fallback;
+    end
+
+    return key;
+end
+
+local function normalize_filter(value)
+    local filter = trim_string(value):lower();
+    if (VALID_FILTERS[filter] == true) then
+        return filter;
+    end
+
+    return nil;
+end
+
+local function normalize_filters(tab)
+    local source = tab.filters or tab.filter or {};
+    local filters = {};
+
+    if (type(source) ~= 'table') then
+        source = { source };
+    end
+
+    for _, value in ipairs(source) do
+        local filter = normalize_filter(value);
+        if (filter ~= nil and filters[filter] ~= true) then
+            table.insert(filters, filter);
+            filters[filter] = true;
+        end
+    end
+
+    if (#filters == 0 and tab.modes == nil and tab.mode == nil and tab.contains == nil and tab.contain == nil) then
+        table.insert(filters, 'all');
+        filters.all = true;
+    end
+
+    return filters;
+end
+
+local function normalize_modes(tab)
+    local source = tab.modes or tab.mode or {};
+    local modes = {};
+    local mode_map = {};
+
+    if (type(source) ~= 'table') then
+        source = { source };
+    end
+
+    for _, value in ipairs(source) do
+        local mode = tonumber(value);
+        if (mode ~= nil) then
+            mode = bit.band(math.floor(mode), 0x000000FF);
+            if (mode_map[mode] ~= true) then
+                table.insert(modes, mode);
+                mode_map[mode] = true;
+            end
+        end
+    end
+
+    return modes, mode_map;
+end
+
+local function normalize_contains(tab)
+    local source = tab.contains or tab.contain or {};
+    local contains = {};
+
+    if (type(source) ~= 'table') then
+        source = { source };
+    end
+
+    for _, value in ipairs(source) do
+        local needle = trim_string(value):lower();
+        if (needle ~= '') then
+            table.insert(contains, needle);
+        end
+    end
+
+    return contains;
+end
+
+local function normalize_tab(raw, index, used_keys)
+    local tab = type(raw) == 'table' and raw or {};
+    local label = trim_string(tab.label or tab.name);
+    if (label == '') then
+        label = ('Tab %d'):fmt(index);
+    end
+
+    local key = normalize_key(tab.key or tab.id or label, ('tab%d'):fmt(index));
+    local base_key = key;
+    local suffix = 2;
+    while (used_keys[key] == true) do
+        key = ('%s%d'):fmt(base_key, suffix);
+        suffix = suffix + 1;
+    end
+    used_keys[key] = true;
+
+    local modes, mode_map = normalize_modes(tab);
+
+    return {
+        key = key,
+        label = label,
+        filters = normalize_filters(tab),
+        modes = modes,
+        mode_map = mode_map,
+        contains = normalize_contains(tab),
+    };
+end
+
+local function normalize_tabs(source)
+    local tabs = {};
+    local used_keys = {};
+
+    if (type(source) ~= 'table' or #source == 0) then
+        source = DEFAULT_TABS;
+    end
+
+    for index, tab in ipairs(source) do
+        table.insert(tabs, normalize_tab(tab, index, used_keys));
+    end
+
+    if (#tabs == 0) then
+        for index, tab in ipairs(DEFAULT_TABS) do
+            table.insert(tabs, normalize_tab(tab, index, used_keys));
+        end
+    end
+
+    return tabs;
+end
+
+local function rebuild_tab_lookup()
+    state.tab_by_key = {};
+    for index, tab in ipairs(state.tabs) do
+        tab.index = index;
+        state.tab_by_key[tab.key] = tab;
+    end
+
+    if (state.tab_by_key[state.selected_tab] == nil and #state.tabs > 0) then
+        state.selected_tab = state.tabs[1].key;
+    end
+end
+
+local function configured_tabs(config)
+    if (type(config) ~= 'table') then
+        return nil;
+    end
+
+    if (type(config.tabs) == 'table') then
+        return config.tabs;
+    end
+
+    if (type(config.settings) == 'table' and type(config.settings.tabs) == 'table') then
+        return config.settings.tabs;
+    end
+
+    return nil;
+end
+
+local function load_config()
+    state.config_error = nil;
+    package.loaded.ashitachat_config = nil;
+
+    local ok, config = pcall(require, 'ashitachat_config');
+    if (not ok) then
+        state.config_error = tostring(config);
+        state.tabs = normalize_tabs(DEFAULT_TABS);
+    else
+        state.tabs = normalize_tabs(configured_tabs(config));
+    end
+
+    rebuild_tab_lookup();
+    state.scroll_to_bottom = true;
+end
+
+local function filters_summary(tab)
+    local parts = {};
+
+    for _, filter in ipairs(tab.filters or {}) do
+        table.insert(parts, filter);
+    end
+
+    for _, mode in ipairs(tab.modes or {}) do
+        table.insert(parts, ('mode:%d'):fmt(mode));
+    end
+
+    for _, needle in ipairs(tab.contains or {}) do
+        table.insert(parts, ('contains:%s'):fmt(needle));
+    end
+
+    if (#parts == 0) then
+        return 'none';
+    end
+
+    return table.concat(parts, ',');
+end
+
+local function find_tab(value)
+    local text = trim_string(value);
+    if (text == '') then
+        return nil;
+    end
+
+    local index = tonumber(text);
+    if (index ~= nil and state.tabs[math.floor(index)] ~= nil) then
+        return state.tabs[math.floor(index)];
+    end
+
+    local key = normalize_key(text, '');
+    if (state.tab_by_key[key] ~= nil) then
+        return state.tab_by_key[key];
+    end
+
+    local lower = text:lower();
+    for _, tab in ipairs(state.tabs) do
+        if (tab.label:lower() == lower) then
+            return tab;
+        end
+    end
+
+    return nil;
 end
 
 local function log_info(message)
@@ -233,12 +463,30 @@ local function message_matches_search(message, query)
     return message.search_text:find(query, 1, true) ~= nil;
 end
 
-local function message_matches_tab(message, tab_key)
-    if (tab_key == 'general') then
+local function message_matches_tab(message, tab)
+    if (tab == nil) then
+        return false;
+    end
+
+    if ((tab.filters or {}).all == true) then
         return true;
     end
 
-    return message.category == tab_key;
+    if ((tab.filters or {})[message.category] == true) then
+        return true;
+    end
+
+    if ((tab.mode_map or {})[message.mode] == true) then
+        return true;
+    end
+
+    for _, needle in ipairs(tab.contains or {}) do
+        if (message.search_text:find(needle, 1, true) ~= nil) then
+            return true;
+        end
+    end
+
+    return false;
 end
 
 local function append_message(e)
@@ -350,7 +598,7 @@ local function pop_tab_style()
 end
 
 local function render_tabs()
-    for index, tab in ipairs(TABS) do
+    for index, tab in ipairs(state.tabs) do
         if (index > 1) then
             imgui.SameLine(0, 4);
         end
@@ -419,7 +667,7 @@ end
 
 local function render_message_list()
     local query = normalized_search();
-    local selected_tab = TAB_BY_KEY[state.selected_tab] ~= nil and state.selected_tab or 'general';
+    local selected_tab = state.tab_by_key[state.selected_tab] or state.tabs[1];
     local child_open, child_visible = begin_child('##ashitachat_message_list', { 0, -26 }, true);
     local visible_count = 0;
 
@@ -539,6 +787,12 @@ local function set_hidden(hidden)
     end
 end
 
+local function print_tabs()
+    for _, tab in ipairs(state.tabs) do
+        log_info(('%d. %s (%s): %s'):fmt(tab.index, tab.label, tab.key, filters_summary(tab)));
+    end
+end
+
 local function print_help()
     log_info('Commands:');
     log_info('/ashitachat hide - Block non-injected incoming chat lines from the native log.');
@@ -546,16 +800,20 @@ local function print_help()
     log_info('/ashitachat toggle - Toggle native chat-line blocking.');
     log_info('/ashitachat ui - Toggle the replacement chat window.');
     log_info('/ashitachat clear - Clear the replacement chat buffer.');
-    log_info('/ashitachat tab <general|combat|group|lfg> - Switch replacement chat tabs.');
+    log_info('/ashitachat tab <key|number> - Switch replacement chat tabs.');
+    log_info('/ashitachat tabs - List configured replacement chat tabs.');
+    log_info('/ashitachat reload - Reload ashitachat_config.lua.');
     log_info('/ashitachat status - Show trial status, pin count, and blocked-line count.');
 end
 
 local function print_status()
     log_info(string.format(
-        'Status: nativeChat=%s, overlay=%s, tab=%s, bufferedLines=%d, blockedLines=%d, pins=%d, pointers=%s, modes=%s.',
+        'Status: nativeChat=%s, overlay=%s, tab=%s, tabs=%d, config=%s, bufferedLines=%d, blockedLines=%d, pins=%d, pointers=%s, modes=%s.',
         state.hide_native and 'hidden' or 'visible',
         state.ui_visible[1] and 'visible' or 'hidden',
         state.selected_tab,
+        #state.tabs,
+        state.config_error == nil and 'ready' or 'defaulted',
         #state.messages,
         state.blocked_count,
         state.pin_count,
@@ -564,7 +822,11 @@ local function print_status()
 end
 
 ashita.events.register('load', 'load_cb', function ()
+    load_config();
     log_info('Loaded. Replacement chat window is visible; native chat is visible until /ashitachat hide is used.');
+    if (state.config_error ~= nil) then
+        log_warn('Using default tab config because ashitachat_config.lua did not load: ' .. state.config_error);
+    end
 end);
 
 ashita.events.register('unload', 'unload_cb', function ()
@@ -603,13 +865,21 @@ ashita.events.register('command', 'command_cb', function (e)
         state.scroll_to_bottom = true;
         log_info('Replacement chat buffer cleared.');
     elseif (action == 'tab') then
-        local tab = args[3] and args[3]:lower() or '';
-        if (TAB_BY_KEY[tab] == nil) then
-            log_warn('Unknown tab. Use general, combat, group, or lfg.');
+        local tab = find_tab(args[3]);
+        if (tab == nil) then
+            log_warn('Unknown tab. Use /ashitachat tabs to list configured tabs.');
         else
-            state.selected_tab = tab;
+            state.selected_tab = tab.key;
             state.scroll_to_bottom = true;
-            log_info('Replacement chat tab set to ' .. tab .. '.');
+            log_info('Replacement chat tab set to ' .. tab.label .. '.');
+        end
+    elseif (action == 'tabs') then
+        print_tabs();
+    elseif (action == 'reload') then
+        load_config();
+        log_info(('Reloaded %d configured replacement chat tabs.'):fmt(#state.tabs));
+        if (state.config_error ~= nil) then
+            log_warn('Using default tab config because ashitachat_config.lua did not load: ' .. state.config_error);
         end
     elseif (action == 'status') then
         print_status();

@@ -24,6 +24,25 @@ it only captures non-injected incoming chat text and renders it locally. Injecte
 addon/status output is left out of the replacement buffer so verbose addon
 configuration/status lines do not flood the chat tabs.
 
+Tabs are configured in `ashitachat/ashitachat_config.lua`. The default config
+matches the current behavior, and tab order is the order of entries in that
+file:
+
+```lua
+return {
+    tabs = {
+        { key = 'general', label = 'General', filters = { 'all' } },
+        { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
+        { key = 'group', label = 'Group', filters = { 'group' } },
+        { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
+    },
+}
+```
+
+Each tab can use `filters`, `modes`, and/or `contains`. Valid filters are
+`all`, `general`, `combat`, `group`, and `lfg`. `modes` matches exact Ashita
+chat modes. `contains` matches case-insensitive text fragments.
+
 The addon can also suppress native chat-log lines and pin the legacy chat
 windows closed while chat input is not open.
 
@@ -68,6 +87,8 @@ Then load in game:
 /ashitachat tab combat
 /ashitachat tab group
 /ashitachat tab lfg
+/ashitachat tabs
+/ashitachat reload
 /ashitachat status
 /ashitachat help
 ```
