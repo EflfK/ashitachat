@@ -19,6 +19,7 @@ $required = @(
     "ashita.events.register('command'",
     "ashita.events.register('text_in'",
     "e.injected == true",
+    "is_ashitachat_message(e.message)",
     "not is_injected(e)",
     "e.blocked = true"
 )

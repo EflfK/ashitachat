@@ -30,6 +30,10 @@ local function is_injected(e)
     return e.injected == true;
 end
 
+local function is_ashitachat_message(message)
+    return type(message) == 'string' and message:lower():find('%[ashitachat%]') ~= nil;
+end
+
 local function mode_summary()
     local modes = {};
 
@@ -123,6 +127,10 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
     end
 
     if (e.blocked) then
+        return;
+    end
+
+    if (is_ashitachat_message(e.message)) then
         return;
     end
 
