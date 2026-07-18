@@ -20,7 +20,9 @@ four tabs:
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
 
 The window includes a search field and a bounded local buffer. It is passive UI:
-it only captures incoming chat text and renders it locally.
+it only captures non-injected incoming chat text and renders it locally. Injected
+addon/status output is left out of the replacement buffer so verbose addon
+configuration/status lines do not flood the chat tabs.
 
 The addon can also suppress native chat-log lines and pin the legacy chat
 windows closed while chat input is not open.

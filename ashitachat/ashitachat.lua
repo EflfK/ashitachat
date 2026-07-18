@@ -31,22 +31,22 @@ local IMGUI = {
 };
 
 local COLORS = {
-    panel_bg = { 0.015, 0.012, 0.010, 0.88 },
-    child_bg = { 0.000, 0.000, 0.000, 0.72 },
-    border = { 0.55, 0.36, 0.18, 0.95 },
-    tab = { 0.070, 0.050, 0.045, 0.96 },
+    panel_bg = { 0.010, 0.010, 0.010, 0.96 },
+    child_bg = { 0.000, 0.000, 0.000, 0.88 },
+    border = { 0.70, 0.44, 0.18, 1.00 },
+    tab = { 0.075, 0.055, 0.050, 0.98 },
     tab_hover = { 0.145, 0.085, 0.050, 0.98 },
     tab_active = { 0.240, 0.125, 0.045, 1.00 },
-    frame = { 0.030, 0.030, 0.030, 0.92 },
+    frame = { 0.015, 0.015, 0.015, 0.98 },
     frame_hover = { 0.080, 0.065, 0.045, 0.96 },
     tab_text = { 0.98, 0.72, 0.22, 1.00 },
-    timestamp = { 0.63, 0.64, 0.68, 1.00 },
-    general = { 0.82, 0.68, 1.00, 1.00 },
+    timestamp = { 0.80, 0.82, 0.86, 1.00 },
+    general = { 0.96, 0.96, 0.98, 1.00 },
     combat = { 1.00, 0.76, 0.46, 1.00 },
-    group = { 0.42, 0.86, 1.00, 1.00 },
+    group = { 0.50, 0.92, 1.00, 1.00 },
     lfg = { 1.00, 0.93, 0.12, 1.00 },
-    status = { 0.72, 0.72, 0.76, 1.00 },
-    empty = { 0.48, 0.48, 0.52, 1.00 },
+    status = { 0.82, 0.82, 0.86, 1.00 },
+    empty = { 0.62, 0.62, 0.66, 1.00 },
 };
 
 local TABS = {
@@ -108,6 +108,7 @@ local state = {
     messages = {},
     message_seq = 0,
     max_messages = 300,
+    font_scale = 1.12,
     scroll_to_bottom = true,
     blocked_count = 0,
     pin_count = 0,
@@ -241,6 +242,10 @@ local function message_matches_tab(message, tab_key)
 end
 
 local function append_message(e)
+    if (is_injected(e)) then
+        return false;
+    end
+
     local mode = chat_mode(e);
     if (mode == 150 or mode == 151 or mode == 152) then
         return false;
@@ -465,10 +470,10 @@ local function render_chat_window()
 
     local window_flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
     imgui.SetNextWindowPos({ 18, 520 }, IMGUI.cond_first_use);
-    imgui.SetNextWindowSize({ 760, 310 }, IMGUI.cond_first_use);
-    imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 5 });
+    imgui.SetNextWindowSize({ 840, 340 }, IMGUI.cond_first_use);
+    imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 6 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
-    imgui.PushStyleVar(IMGUI.style_frame_padding, { 7, 4 });
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 8, 5 });
     imgui.PushStyleColor(IMGUI.col_window_bg, COLORS.panel_bg);
     imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
     imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
@@ -476,6 +481,10 @@ local function render_chat_window()
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
     if (imgui.Begin(('AshitaChat###AshitaChatWindow'), state.ui_visible, window_flags)) then
+        if (type(imgui.SetWindowFontScale) == 'function') then
+            imgui.SetWindowFontScale(state.font_scale);
+        end
+
         render_tabs();
         render_search();
         imgui.Separator();

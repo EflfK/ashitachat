@@ -22,6 +22,7 @@ $required = @(
     "search_buffer = T{ '' }",
     "messages = {}",
     "append_message(e)",
+    "if (is_injected(e)) then",
     "render_chat_window()",
     "ashita.events.register('command'",
     "ashita.events.register('d3d_present'",
