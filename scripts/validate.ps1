@@ -15,6 +15,7 @@ $lua = Get-Content -LiteralPath $addon -Raw
 
 $required = @(
     "addon.name = 'ashitachat'",
+    "require('common')",
     "ashita.events.register('command'",
     "ashita.events.register('text_in'",
     "e.injected == true",

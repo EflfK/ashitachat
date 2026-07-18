@@ -3,6 +3,8 @@ addon.author = 'EflfK';
 addon.version = '0.1.0';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
+require('common');
+
 local chat = require('chat');
 
 local state = {
