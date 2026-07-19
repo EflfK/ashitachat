@@ -46,7 +46,9 @@ return {
 
 Each tab can use `filters`, `modes`, and/or `contains`. Valid filters are
 `all`, `general`, `combat`, `group`, and `lfg`. `modes` matches exact Ashita
-chat modes. `contains` matches case-insensitive text fragments.
+chat modes; the in-game config exposes common mode groups as checkboxes and
+keeps a raw comma-separated `Mode IDs` field for exact/custom IDs. `contains`
+matches case-insensitive text fragments.
 
 The addon can also suppress native chat-log lines and pin the legacy chat
 windows closed while chat input is not open.

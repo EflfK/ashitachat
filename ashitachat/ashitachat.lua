@@ -80,6 +80,20 @@ local VALID_FILTERS = {
 
 local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg' };
 
+local MODE_FILTERS = {
+    { key = 'say', label = 'Say', modes = { 1, 9 } },
+    { key = 'shout', label = 'Shout', modes = { 2, 3, 10 } },
+    { key = 'yell', label = 'Yell', modes = { 11 } },
+    { key = 'tell', label = 'Tell', modes = { 4, 12 } },
+    { key = 'party', label = 'Party', modes = { 5, 13, 210 } },
+    { key = 'linkshell', label = 'Linkshell', modes = { 6, 14, 205 } },
+    { key = 'linkshell2', label = 'Linkshell 2', modes = { 213, 214, 217 } },
+    { key = 'emote', label = 'Emote', modes = { 8 } },
+    { key = 'system', label = 'System', modes = { 29, 121 } },
+    { key = 'unity', label = 'Unity', modes = { 212 } },
+    { key = 'assist', label = 'Assist', modes = { 220, 222 } },
+};
+
 local MODE_LABELS = {
     [1] = 'say',
     [2] = 'shout',
@@ -99,7 +113,6 @@ local MODE_LABELS = {
     [214] = 'linkshell2',
     [217] = 'linkshell2',
     [9] = 'say',
-    [11] = 'yell',
     [29] = 'system',
     [121] = 'system',
     [212] = 'unity',
@@ -403,6 +416,59 @@ local function parse_mode_list(value)
     return results;
 end
 
+local function mode_map_from_list(modes)
+    local mode_map = {};
+    for _, value in ipairs(modes or {}) do
+        local mode = tonumber(value);
+        if (mode ~= nil) then
+            mode = bit.band(math.floor(mode), 0x000000FF);
+            mode_map[mode] = true;
+        end
+    end
+
+    return mode_map;
+end
+
+local function mode_list_from_map(mode_map)
+    local modes = {};
+    for mode, enabled in pairs(mode_map or {}) do
+        if (enabled == true) then
+            table.insert(modes, mode);
+        end
+    end
+
+    table.sort(modes);
+    return modes;
+end
+
+local function mode_buffer_from_map(mode_map)
+    return list_text(mode_list_from_map(mode_map));
+end
+
+local function sync_row_mode_map(row)
+    row.mode_map = mode_map_from_list(parse_mode_list(row.modes_buffer and row.modes_buffer[1] or ''));
+end
+
+local function mode_group_enabled(row, modes)
+    local mode_map = row.mode_map or {};
+    for _, mode in ipairs(modes or {}) do
+        if (mode_map[mode] ~= true) then
+            return false;
+        end
+    end
+
+    return #(modes or {}) > 0;
+end
+
+local function set_mode_group_enabled(row, modes, enabled)
+    row.mode_map = row.mode_map or {};
+    for _, mode in ipairs(modes or {}) do
+        row.mode_map[mode] = enabled == true or nil;
+    end
+
+    buffer_set(row.modes_buffer, mode_buffer_from_map(row.mode_map));
+end
+
 local function config_list(values, quote_values)
     local pieces = {};
     for _, value in ipairs(values or {}) do
@@ -418,6 +484,7 @@ end
 
 local function editor_from_tab(tab, index)
     local filters = {};
+    local modes = tab.modes or {};
     for _, filter in ipairs(FILTER_ORDER) do
         filters[filter] = false;
     end
@@ -432,7 +499,8 @@ local function editor_from_tab(tab, index)
         key_buffer = T{ tab.key or ('tab%d'):fmt(index) },
         label_buffer = T{ tab.label or ('Tab %d'):fmt(index) },
         filters = filters,
-        modes_buffer = T{ list_text(tab.modes) },
+        mode_map = mode_map_from_list(modes),
+        modes_buffer = T{ list_text(modes) },
         contains_buffer = T{ list_text(tab.contains) },
     };
 end
@@ -1088,6 +1156,14 @@ local function render_config_filter_checkbox(row, index, filter)
     end
 end
 
+local function render_config_mode_checkbox(row, index, mode_filter)
+    local enabled = mode_group_enabled(row, mode_filter.modes);
+    if (imgui.Checkbox(('%s##ashitachat_config_tab_%d_mode_%s'):fmt(mode_filter.label, index, mode_filter.key), { enabled })) then
+        set_mode_group_enabled(row, mode_filter.modes, not enabled);
+        mark_config_dirty();
+    end
+end
+
 local function render_config_tab_editor(index, row)
     imgui.Separator();
     imgui.TextColored(COLORS.tab_text, ('Tab %d'):fmt(index));
@@ -1128,8 +1204,18 @@ local function render_config_tab_editor(index, row)
         render_config_filter_checkbox(row, index, filter);
     end
 
+    imgui.TextColored(COLORS.status, 'Modes');
+    sync_row_mode_map(row);
+    for mode_index, mode_filter in ipairs(MODE_FILTERS) do
+        if (mode_index > 1 and ((mode_index - 1) % 4) ~= 0) then
+            imgui.SameLine(0, 8);
+        end
+        render_config_mode_checkbox(row, index, mode_filter);
+    end
+
     imgui.PushItemWidth(520);
-    if (imgui.InputText(('Modes##ashitachat_config_tab_%d_modes'):fmt(index), row.modes_buffer, 128)) then
+    if (imgui.InputText(('Mode IDs##ashitachat_config_tab_%d_modes'):fmt(index), row.modes_buffer, 128)) then
+        sync_row_mode_map(row);
         mark_config_dirty();
     end
     if (imgui.InputText(('Contains##ashitachat_config_tab_%d_contains'):fmt(index), row.contains_buffer, 256)) then
