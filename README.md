@@ -11,8 +11,10 @@ Initial scope:
 
 ## Current Trial
 
-This version renders a draggable, resizable ImGui replacement chat window with
-four tabs:
+This version renders a draggable, resizable ImGui replacement chat window styled
+to stay close to the native FFXI chat log: a translucent black panel, muted
+square tabs, compact text, and channel colors mapped from Ashita chat modes.
+It starts with four tabs:
 
 - General: all captured chat lines.
 - Combat Log: battle, casting, damage, and status-effect style lines.
@@ -20,13 +22,16 @@ four tabs:
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
 
 The window includes a search field and a bounded local buffer. It is passive UI:
-it only captures non-injected incoming chat text and renders it locally. Injected
+it only captures non-injected incoming chat text and renders it locally. Say,
+shout, yell, tell, party, linkshell, assist, emote, system, and combat-style
+lines are colored from the closest known native chat mode colors. Injected
 addon/status output is left out of the replacement buffer so verbose addon
-configuration/status lines do not flood the chat tabs.
+configuration or status lines do not flood the chat tabs.
 
-Tabs are configured in `ashitachat/ashitachat_config.lua`. The default config
-matches the current behavior, and tab order is the order of entries in that
-file:
+Tabs can be configured in game with `/ashitachat config`. The configuration
+window can add, remove, rename, reorder, apply, and save tab definitions. Save
+writes `ashitachat/ashitachat_config.lua`, and tab order is the order of entries
+in that file:
 
 ```lua
 return {
@@ -82,6 +87,7 @@ Then load in game:
 /ashitachat show
 /ashitachat toggle
 /ashitachat ui
+/ashitachat config
 /ashitachat clear
 /ashitachat tab general
 /ashitachat tab combat
