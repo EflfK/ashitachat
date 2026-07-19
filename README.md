@@ -11,44 +11,56 @@ Initial scope:
 
 ## Current Trial
 
-This version renders a draggable, resizable ImGui replacement chat window styled
+This version renders draggable, resizable ImGui replacement chat windows styled
 to stay close to the native FFXI chat log: a translucent black panel, muted
 square tabs, compact text, and channel colors mapped from Ashita chat modes.
-It starts with four tabs:
+It starts with one Main window containing four tabs:
 
 - General: all captured chat lines.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
 
-The window includes a search field and a bounded local buffer. It is passive UI:
-it only captures non-injected incoming chat text and renders it locally. Say,
-shout, yell, tell, party, linkshell, assist, emote, system, and combat-style
-lines are colored from the closest known native chat mode colors. Injected
-addon/status output is left out of the replacement buffer so verbose addon
-configuration or status lines do not flood the chat tabs.
+Each window includes its own tab selection, search field, and scroll state over
+the same bounded local chat buffer. It is passive UI: it only captures
+non-injected incoming chat text and renders it locally. Say, shout, yell, tell,
+party, linkshell, assist, emote, system, and combat-style lines are colored from
+the closest known native chat mode colors. Injected addon/status output is left
+out of the replacement buffer so verbose addon configuration or status lines do
+not flood the chat tabs.
 
-Tabs can be configured in game with `/ashitachat config`. The configuration
-window can add, remove, rename, reorder, apply, and save tab definitions. Save
-writes `ashitachat/ashitachat_config.lua`, and tab order is the order of entries
-in that file:
+Windows and tabs can be configured in game with `/ashitachat config`. The
+configuration window can add, remove, rename, reorder, apply, and save window
+definitions. Each configured chat window has its own configuration tab, and the
+selected window editor manages that window's chat tabs. Save writes
+`ashitachat/ashitachat_config.lua`, and render order is the order of entries in
+that file:
 
 ```lua
 return {
-    tabs = {
-        { key = 'general', label = 'General', filters = { 'all' } },
-        { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
-        { key = 'group', label = 'Group', filters = { 'group' } },
-        { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
+    windows = {
+        {
+            key = 'main',
+            label = 'Main',
+            visible = true,
+            tabs = {
+                { key = 'general', label = 'General', filters = { 'all' } },
+                { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
+                { key = 'group', label = 'Group', filters = { 'group' } },
+                { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
+            },
+        },
     },
 }
 ```
 
-Each tab can use `filters`, `modes`, and/or `contains`. Valid filters are
-`all`, `general`, `combat`, `group`, and `lfg`. `modes` matches exact Ashita
-chat modes; the in-game config exposes common mode groups as checkboxes and
-keeps a raw comma-separated `Mode IDs` field for exact/custom IDs. `contains`
-matches case-insensitive text fragments.
+Each window can contain multiple tabs. Each tab can use `filters`, `modes`,
+and/or `contains`. Valid filters are `all`, `general`, `combat`, `group`, and
+`lfg`. `modes` matches exact Ashita chat modes; the in-game config exposes
+common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
+field for exact/custom IDs. `contains` matches case-insensitive text fragments.
+Legacy configs with top-level `tabs = { ... }` still load as a single Main
+window.
 
 The addon can also suppress native chat-log lines and pin the legacy chat
 windows closed while chat input is not open.
@@ -89,13 +101,16 @@ Then load in game:
 /ashitachat show
 /ashitachat toggle
 /ashitachat ui
+/ashitachat window main toggle
 /ashitachat config
 /ashitachat clear
 /ashitachat tab general
+/ashitachat tab combat main
 /ashitachat tab combat
 /ashitachat tab group
 /ashitachat tab lfg
 /ashitachat tabs
+/ashitachat windows
 /ashitachat reload
 /ashitachat status
 /ashitachat help

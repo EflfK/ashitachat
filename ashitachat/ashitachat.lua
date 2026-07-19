@@ -70,6 +70,10 @@ local DEFAULT_TABS = {
     { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
 };
 
+local DEFAULT_WINDOWS = {
+    { key = 'main', label = 'Main', visible = true, tabs = DEFAULT_TABS },
+};
+
 local VALID_FILTERS = {
     all = true,
     general = true,
@@ -169,15 +173,14 @@ local state = {
     hide_native = false,
     ui_visible = T{ true },
     config_visible = T{ false },
-    selected_tab = 'general',
-    tabs = {},
-    tab_by_key = {},
+    windows = {},
+    window_by_key = {},
     config_error = nil,
-    config_tabs = {},
+    config_windows = {},
+    config_selected_window = 1,
     config_dirty = false,
     config_message = nil,
     config_message_color = nil,
-    search_buffer = T{ '' },
     messages = {},
     message_seq = 0,
     max_messages = 300,
@@ -338,6 +341,61 @@ local function normalize_tabs(source)
     end
 
     return tabs;
+end
+
+local function normalize_window(raw, index, used_keys)
+    local source = type(raw) == 'table' and raw or {};
+    local label = trim_string(source.label or source.name);
+    if (label == '') then
+        label = ('Window %d'):fmt(index);
+    end
+
+    local key = normalize_key(source.key or source.id or label, ('window%d'):fmt(index));
+    local base_key = key;
+    local suffix = 2;
+    while (used_keys[key] == true) do
+        key = ('%s%d'):fmt(base_key, suffix);
+        suffix = suffix + 1;
+    end
+    used_keys[key] = true;
+
+    return {
+        key = key,
+        label = label,
+        visible = T{ source.visible ~= false and source.hidden ~= true },
+        tabs = normalize_tabs(source.tabs),
+        tab_by_key = {},
+        selected_tab = normalize_key(source.selected_tab or source.selected or '', ''),
+        search_buffer = T{ '' },
+        scroll_to_bottom = true,
+    };
+end
+
+local function normalize_windows(source)
+    local windows = {};
+    local used_keys = {};
+
+    if (type(source) ~= 'table' or #source == 0) then
+        source = DEFAULT_WINDOWS;
+    end
+
+    for index, window in ipairs(source) do
+        table.insert(windows, normalize_window(window, index, used_keys));
+    end
+
+    if (#windows == 0) then
+        for index, window in ipairs(DEFAULT_WINDOWS) do
+            table.insert(windows, normalize_window(window, index, used_keys));
+        end
+    end
+
+    return windows;
+end
+
+local function mark_windows_scroll_to_bottom()
+    for _, window in ipairs(state.windows) do
+        window.scroll_to_bottom = true;
+    end
 end
 
 local function path_join(left, right)
@@ -505,17 +563,6 @@ local function editor_from_tab(tab, index)
     };
 end
 
-local function sync_config_editor_from_tabs(dirty)
-    state.config_tabs = {};
-    for index, tab in ipairs(state.tabs) do
-        table.insert(state.config_tabs, editor_from_tab(tab, index));
-    end
-
-    state.config_dirty = dirty == true;
-    state.config_message = nil;
-    state.config_message_color = nil;
-end
-
 local function config_editor_tab(row, index)
     local label = trim_string(row.label_buffer and row.label_buffer[1] or '');
     if (label == '') then
@@ -538,38 +585,124 @@ local function config_editor_tab(row, index)
     };
 end
 
-local function config_editor_tabs()
+local function editor_from_window(window, index)
+    local visible = true;
+    if (type(window.visible) == 'table') then
+        visible = window.visible[1] ~= false;
+    elseif (window.visible == false or window.hidden == true) then
+        visible = false;
+    end
+
     local tabs = {};
-    for index, row in ipairs(state.config_tabs) do
+    for tab_index, tab in ipairs(window.tabs or DEFAULT_TABS) do
+        table.insert(tabs, editor_from_tab(tab, tab_index));
+    end
+
+    return {
+        key_buffer = T{ window.key or ('window%d'):fmt(index) },
+        label_buffer = T{ window.label or ('Window %d'):fmt(index) },
+        visible = visible,
+        tabs = tabs,
+    };
+end
+
+local function sync_config_editor_from_windows(dirty)
+    state.config_windows = {};
+    for index, window in ipairs(state.windows) do
+        table.insert(state.config_windows, editor_from_window(window, index));
+    end
+
+    if (#state.config_windows == 0) then
+        local used_keys = {};
+        table.insert(state.config_windows, editor_from_window(normalize_window(DEFAULT_WINDOWS[1], 1, used_keys), 1));
+    end
+
+    state.config_selected_window = math.floor(tonumber(state.config_selected_window) or 1);
+    if (state.config_selected_window < 1 or state.config_selected_window > #state.config_windows) then
+        state.config_selected_window = 1;
+    end
+
+    state.config_dirty = dirty == true;
+    state.config_message = nil;
+    state.config_message_color = nil;
+end
+
+local function config_editor_tabs(window_row)
+    local tabs = {};
+    for index, row in ipairs(window_row.tabs or {}) do
         table.insert(tabs, config_editor_tab(row, index));
     end
 
     return tabs;
 end
 
-local function config_text_from_tabs(tabs)
-    local lines = {
-        'return {',
-        '    tabs = {',
+local function config_editor_window(row, index)
+    local label = trim_string(row.label_buffer and row.label_buffer[1] or '');
+    if (label == '') then
+        label = ('Window %d'):fmt(index);
+    end
+
+    return {
+        key = normalize_key(row.key_buffer and row.key_buffer[1] or '', ('window%d'):fmt(index)),
+        label = label,
+        visible = row.visible ~= false,
+        tabs = config_editor_tabs(row),
+    };
+end
+
+local function config_editor_windows()
+    local windows = {};
+    for index, row in ipairs(state.config_windows) do
+        table.insert(windows, config_editor_window(row, index));
+    end
+
+    return windows;
+end
+
+local function tab_config_fields(tab)
+    local fields = {
+        ('key = %s'):fmt(config_string(tab.key)),
+        ('label = %s'):fmt(config_string(tab.label)),
     };
 
-    for _, tab in ipairs(tabs or {}) do
-        local fields = {
-            ('key = %s'):fmt(config_string(tab.key)),
-            ('label = %s'):fmt(config_string(tab.label)),
-        };
+    if (#(tab.filters or {}) > 0) then
+        table.insert(fields, ('filters = %s'):fmt(config_list(tab.filters, true)));
+    end
+    if (#(tab.modes or {}) > 0) then
+        table.insert(fields, ('modes = %s'):fmt(config_list(tab.modes, false)));
+    end
+    if (#(tab.contains or {}) > 0) then
+        table.insert(fields, ('contains = %s'):fmt(config_list(tab.contains, true)));
+    end
 
-        if (#(tab.filters or {}) > 0) then
-            table.insert(fields, ('filters = %s'):fmt(config_list(tab.filters, true)));
-        end
-        if (#(tab.modes or {}) > 0) then
-            table.insert(fields, ('modes = %s'):fmt(config_list(tab.modes, false)));
-        end
-        if (#(tab.contains or {}) > 0) then
-            table.insert(fields, ('contains = %s'):fmt(config_list(tab.contains, true)));
-        end
+    return fields;
+end
 
-        table.insert(lines, ('        { %s },'):fmt(table.concat(fields, ', ')));
+local function window_visible_value(window)
+    if (type(window.visible) == 'table') then
+        return window.visible[1] ~= false;
+    end
+
+    return window.visible ~= false;
+end
+
+local function config_text_from_windows(windows)
+    local lines = {
+        'return {',
+        '    windows = {',
+    };
+
+    for _, window in ipairs(windows or {}) do
+        table.insert(lines, '        {');
+        table.insert(lines, ('            key = %s,'):fmt(config_string(window.key)));
+        table.insert(lines, ('            label = %s,'):fmt(config_string(window.label)));
+        table.insert(lines, ('            visible = %s,'):fmt(window_visible_value(window) and 'true' or 'false'));
+        table.insert(lines, '            tabs = {');
+        for _, tab in ipairs(window.tabs or {}) do
+            table.insert(lines, ('                { %s },'):fmt(table.concat(tab_config_fields(tab), ', ')));
+        end
+        table.insert(lines, '            },');
+        table.insert(lines, '        },');
     end
 
     table.insert(lines, '    },');
@@ -579,43 +712,44 @@ local function config_text_from_tabs(tabs)
     return table.concat(lines, '\n');
 end
 
-local rebuild_tab_lookup;
+local rebuild_window_lookups;
 
 local function apply_config_editor()
-    state.tabs = normalize_tabs(config_editor_tabs());
-    rebuild_tab_lookup();
-    sync_config_editor_from_tabs(true);
+    state.windows = normalize_windows(config_editor_windows());
+    rebuild_window_lookups();
+    sync_config_editor_from_windows(true);
     state.config_message = 'Applied.';
     state.config_message_color = COLORS.success;
-    state.scroll_to_bottom = true;
+    mark_windows_scroll_to_bottom();
 end
 
 local function save_config()
-    local tabs = normalize_tabs(config_editor_tabs());
+    local windows = normalize_windows(config_editor_windows());
     local path = config_file_path();
     local file, error_message = io.open(path, 'w');
     if (file == nil) then
         return false, tostring(error_message or 'open failed');
     end
 
-    file:write(config_text_from_tabs(tabs));
+    file:write(config_text_from_windows(windows));
     file:close();
 
-    state.tabs = tabs;
-    rebuild_tab_lookup();
-    sync_config_editor_from_tabs(false);
+    state.windows = windows;
+    rebuild_window_lookups();
+    sync_config_editor_from_windows(false);
     state.config_message = 'Saved.';
     state.config_message_color = COLORS.success;
-    state.scroll_to_bottom = true;
+    mark_windows_scroll_to_bottom();
     return true, ('Saved %s.'):fmt(path);
 end
 
 local function reset_config_editor_to_defaults()
     local used_keys = {};
-    state.config_tabs = {};
-    for index, tab in ipairs(DEFAULT_TABS) do
-        table.insert(state.config_tabs, editor_from_tab(normalize_tab(tab, index, used_keys), index));
+    state.config_windows = {};
+    for index, window in ipairs(DEFAULT_WINDOWS) do
+        table.insert(state.config_windows, editor_from_window(normalize_window(window, index, used_keys), index));
     end
+    state.config_selected_window = 1;
     state.config_dirty = true;
     state.config_message = 'Reset pending.';
     state.config_message_color = COLORS.status;
@@ -627,15 +761,29 @@ local function mark_config_dirty()
     state.config_message_color = nil;
 end
 
-function rebuild_tab_lookup()
-    state.tab_by_key = {};
-    for index, tab in ipairs(state.tabs) do
+local function rebuild_window_tab_lookup(window)
+    window.tab_by_key = {};
+    for index, tab in ipairs(window.tabs) do
         tab.index = index;
-        state.tab_by_key[tab.key] = tab;
+        window.tab_by_key[tab.key] = tab;
     end
 
-    if (state.tab_by_key[state.selected_tab] == nil and #state.tabs > 0) then
-        state.selected_tab = state.tabs[1].key;
+    if ((window.selected_tab == nil or window.tab_by_key[window.selected_tab] == nil) and #window.tabs > 0) then
+        window.selected_tab = window.tabs[1].key;
+    end
+end
+
+function rebuild_window_lookups()
+    state.window_by_key = {};
+    for index, window in ipairs(state.windows) do
+        window.index = index;
+        rebuild_window_tab_lookup(window);
+        state.window_by_key[window.key] = window;
+    end
+
+    state.config_selected_window = math.floor(tonumber(state.config_selected_window) or 1);
+    if (state.config_selected_window < 1 or state.config_selected_window > #state.windows) then
+        state.config_selected_window = 1;
     end
 end
 
@@ -655,6 +803,29 @@ local function configured_tabs(config)
     return nil;
 end
 
+local function configured_windows(config)
+    if (type(config) ~= 'table') then
+        return nil;
+    end
+
+    if (type(config.windows) == 'table') then
+        return config.windows;
+    end
+
+    if (type(config.settings) == 'table' and type(config.settings.windows) == 'table') then
+        return config.settings.windows;
+    end
+
+    local tabs = configured_tabs(config);
+    if (tabs ~= nil) then
+        return {
+            { key = 'main', label = 'Main', visible = true, tabs = tabs },
+        };
+    end
+
+    return nil;
+end
+
 local function load_config()
     state.config_error = nil;
     package.loaded.ashitachat_config = nil;
@@ -662,14 +833,14 @@ local function load_config()
     local ok, config = pcall(require, 'ashitachat_config');
     if (not ok) then
         state.config_error = tostring(config);
-        state.tabs = normalize_tabs(DEFAULT_TABS);
+        state.windows = normalize_windows(DEFAULT_WINDOWS);
     else
-        state.tabs = normalize_tabs(configured_tabs(config));
+        state.windows = normalize_windows(configured_windows(config));
     end
 
-    rebuild_tab_lookup();
-    sync_config_editor_from_tabs(false);
-    state.scroll_to_bottom = true;
+    rebuild_window_lookups();
+    sync_config_editor_from_windows(false);
+    mark_windows_scroll_to_bottom();
 end
 
 local function filters_summary(tab)
@@ -694,24 +865,50 @@ local function filters_summary(tab)
     return table.concat(parts, ',');
 end
 
-local function find_tab(value)
+local function find_window(value)
     local text = trim_string(value);
     if (text == '') then
         return nil;
     end
 
     local index = tonumber(text);
-    if (index ~= nil and state.tabs[math.floor(index)] ~= nil) then
-        return state.tabs[math.floor(index)];
+    if (index ~= nil and state.windows[math.floor(index)] ~= nil) then
+        return state.windows[math.floor(index)];
     end
 
     local key = normalize_key(text, '');
-    if (state.tab_by_key[key] ~= nil) then
-        return state.tab_by_key[key];
+    if (state.window_by_key[key] ~= nil) then
+        return state.window_by_key[key];
     end
 
     local lower = text:lower();
-    for _, tab in ipairs(state.tabs) do
+    for _, window in ipairs(state.windows) do
+        if (window.label:lower() == lower) then
+            return window;
+        end
+    end
+
+    return nil;
+end
+
+local function find_tab(window, value)
+    local text = trim_string(value);
+    if (window == nil or text == '') then
+        return nil;
+    end
+
+    local index = tonumber(text);
+    if (index ~= nil and window.tabs[math.floor(index)] ~= nil) then
+        return window.tabs[math.floor(index)];
+    end
+
+    local key = normalize_key(text, '');
+    if (window.tab_by_key[key] ~= nil) then
+        return window.tab_by_key[key];
+    end
+
+    local lower = text:lower();
+    for _, tab in ipairs(window.tabs) do
         if (tab.label:lower() == lower) then
             return tab;
         end
@@ -805,8 +1002,8 @@ local function message_color(mode, category)
     return MODE_COLORS[mode] or COLORS[category] or COLORS.general;
 end
 
-local function normalized_search()
-    return trim_string(state.search_buffer[1]):lower();
+local function normalized_search(window)
+    return trim_string(window.search_buffer[1]):lower();
 end
 
 local function message_matches_search(message, query)
@@ -879,7 +1076,7 @@ local function append_message(e)
         table.remove(state.messages, 1);
     end
 
-    state.scroll_to_bottom = true;
+    mark_windows_scroll_to_bottom();
     return true;
 end
 
@@ -953,37 +1150,43 @@ local function pop_tab_style()
     imgui.PopStyleColor(4);
 end
 
-local function render_tabs()
-    for index, tab in ipairs(state.tabs) do
+local function window_id(window)
+    return window.key or tostring(window.index or 'window');
+end
+
+local function render_tabs(window)
+    local id = window_id(window);
+    for index, tab in ipairs(window.tabs) do
         if (index > 1) then
             imgui.SameLine(0, 2);
         end
 
-        local active = state.selected_tab == tab.key;
+        local active = window.selected_tab == tab.key;
         push_tab_style(active);
-        if (imgui.Button(('%s##ashitachat_tab_%s'):fmt(tab.label, tab.key), { 98, 20 })) then
-            state.selected_tab = tab.key;
-            state.scroll_to_bottom = true;
+        if (imgui.Button(('%s##ashitachat_%s_tab_%s'):fmt(tab.label, id, tab.key), { 98, 20 })) then
+            window.selected_tab = tab.key;
+            window.scroll_to_bottom = true;
         end
         pop_tab_style();
     end
 end
 
-local function render_search()
+local function render_search(window)
     local width = type(imgui.GetWindowWidth) == 'function' and imgui.GetWindowWidth() or 760;
     if (width >= 650) then
         imgui.SameLine(0, 14);
     end
 
+    local id = window_id(window);
     imgui.PushItemWidth(160);
-    imgui.InputText('##ashitachat_search', state.search_buffer, 64);
+    imgui.InputText(('##ashitachat_%s_search'):fmt(id), window.search_buffer, 64);
     imgui.PopItemWidth();
 
-    if (trim_string(state.search_buffer[1]) ~= '') then
+    if (trim_string(window.search_buffer[1]) ~= '') then
         imgui.SameLine(0, 4);
-        if (imgui.Button('x##ashitachat_search_clear', { 20, 20 })) then
-            buffer_set(state.search_buffer, '');
-            state.scroll_to_bottom = true;
+        if (imgui.Button(('x##ashitachat_%s_search_clear'):fmt(id), { 20, 20 })) then
+            buffer_set(window.search_buffer, '');
+            window.scroll_to_bottom = true;
         end
     end
 end
@@ -1021,10 +1224,10 @@ local function render_message(message)
     text_colored_wrapped(message.color, message.display);
 end
 
-local function render_message_list()
-    local query = normalized_search();
-    local selected_tab = state.tab_by_key[state.selected_tab] or state.tabs[1];
-    local child_open, child_visible = begin_child('##ashitachat_message_list', { 0, -24 }, false);
+local function render_message_list(window)
+    local query = normalized_search(window);
+    local selected_tab = window.tab_by_key[window.selected_tab] or window.tabs[1];
+    local child_open, child_visible = begin_child(('##ashitachat_%s_message_list'):fmt(window_id(window)), { 0, -24 }, false);
     local visible_count = 0;
 
     if (child_visible) then
@@ -1044,7 +1247,7 @@ local function render_message_list()
             imgui.TextColored(COLORS.empty, query ~= '' and 'No matches.' or 'No chat lines yet.');
         end
 
-        if (state.scroll_to_bottom and type(imgui.SetScrollHereY) == 'function') then
+        if (window.scroll_to_bottom and type(imgui.SetScrollHereY) == 'function') then
             imgui.SetScrollHereY(1.0);
         end
     end
@@ -1053,31 +1256,34 @@ local function render_message_list()
         imgui.EndChild();
     end
 
-    state.scroll_to_bottom = false;
+    window.scroll_to_bottom = false;
     return visible_count;
 end
 
-local function render_footer(visible_count)
+local function render_footer(window, visible_count)
+    local id = window_id(window);
     imgui.TextColored(COLORS.status, ('%d shown / %d buffered'):fmt(visible_count, #state.messages));
     imgui.SameLine(0, 10);
     imgui.TextColored(COLORS.status, state.hide_native and 'native hidden' or 'native visible');
     imgui.SameLine(0, 10);
-    if (imgui.Button('v##ashitachat_scroll_bottom', { 22, 0 })) then
-        state.scroll_to_bottom = true;
+    if (imgui.Button(('v##ashitachat_%s_scroll_bottom'):fmt(id), { 22, 0 })) then
+        window.scroll_to_bottom = true;
     end
     imgui.SameLine(0, 6);
-    if (imgui.Button('cfg##ashitachat_open_config', { 34, 0 })) then
+    if (imgui.Button(('cfg##ashitachat_%s_open_config'):fmt(id), { 34, 0 })) then
         state.config_visible[1] = true;
+        state.config_selected_window = window.index or 1;
     end
 end
 
-local function render_chat_window()
-    if (state.ui_visible[1] ~= true) then
+local function render_chat_window(window)
+    if (state.ui_visible[1] ~= true or window.visible[1] ~= true) then
         return;
     end
 
     local window_flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
-    imgui.SetNextWindowPos({ 18, 528 }, IMGUI.cond_first_use);
+    local offset = ((window.index or 1) - 1) * 28;
+    imgui.SetNextWindowPos({ 18 + offset, 528 - offset }, IMGUI.cond_first_use);
     imgui.SetNextWindowSize({ 840, 310 }, IMGUI.cond_first_use);
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
@@ -1088,16 +1294,16 @@ local function render_chat_window()
     imgui.PushStyleColor(IMGUI.col_frame_bg, COLORS.frame);
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
-    if (imgui.Begin(('AshitaChat###AshitaChatWindow'), state.ui_visible, window_flags)) then
+    if (imgui.Begin(('AshitaChat - %s###AshitaChatWindow_%s'):fmt(window.label, window_id(window)), window.visible, window_flags)) then
         if (type(imgui.SetWindowFontScale) == 'function') then
             imgui.SetWindowFontScale(state.font_scale);
         end
 
-        render_tabs();
-        render_search();
+        render_tabs(window);
+        render_search(window);
         imgui.Separator();
-        local visible_count = render_message_list();
-        render_footer(visible_count);
+        local visible_count = render_message_list(window);
+        render_footer(window, visible_count);
     end
 
     imgui.End();
@@ -1105,9 +1311,85 @@ local function render_chat_window()
     imgui.PopStyleVar(3);
 end
 
-local function add_config_tab()
-    local index = #state.config_tabs + 1;
-    table.insert(state.config_tabs, editor_from_tab({
+local function render_chat_windows()
+    for _, window in ipairs(state.windows) do
+        render_chat_window(window);
+    end
+end
+
+local function selected_config_window_index()
+    if (#state.config_windows == 0) then
+        return nil;
+    end
+
+    local index = math.floor(tonumber(state.config_selected_window) or 1);
+    if (index < 1) then
+        index = 1;
+    elseif (index > #state.config_windows) then
+        index = #state.config_windows;
+    end
+    state.config_selected_window = index;
+    return index;
+end
+
+local function selected_config_window()
+    local index = selected_config_window_index();
+    if (index == nil) then
+        return nil, nil;
+    end
+
+    return index, state.config_windows[index];
+end
+
+local function add_config_window()
+    local index = #state.config_windows + 1;
+    table.insert(state.config_windows, editor_from_window({
+        key = ('window%d'):fmt(index),
+        label = ('Window %d'):fmt(index),
+        visible = true,
+        tabs = {
+            { key = 'general', label = 'General', filters = { 'all' } },
+        },
+    }, index));
+    state.config_selected_window = index;
+    mark_config_dirty();
+end
+
+local function move_config_window(index, offset)
+    local target = index + offset;
+    if (state.config_windows[index] == nil or state.config_windows[target] == nil) then
+        return;
+    end
+
+    state.config_windows[index], state.config_windows[target] = state.config_windows[target], state.config_windows[index];
+    if (state.config_selected_window == index) then
+        state.config_selected_window = target;
+    elseif (state.config_selected_window == target) then
+        state.config_selected_window = index;
+    end
+    mark_config_dirty();
+end
+
+local function remove_config_window(index)
+    if (#state.config_windows <= 1 or state.config_windows[index] == nil) then
+        return;
+    end
+
+    table.remove(state.config_windows, index);
+    if (state.config_selected_window > #state.config_windows) then
+        state.config_selected_window = #state.config_windows;
+    end
+    mark_config_dirty();
+end
+
+local function add_config_tab(window_index)
+    local window_row = state.config_windows[window_index];
+    if (window_row == nil) then
+        return;
+    end
+
+    local index = #window_row.tabs + 1;
+    table.insert(window_row.tabs, editor_from_tab({
         key = ('tab%d'):fmt(index),
         label = ('Tab %d'):fmt(index),
         filters = { 'general' },
@@ -1117,28 +1399,34 @@ local function add_config_tab()
     mark_config_dirty();
 end
 
-local function move_config_tab(index, offset)
+local function move_config_tab(window_index, index, offset)
+    local window_row = state.config_windows[window_index];
+    if (window_row == nil) then
+        return;
+    end
+
     local target = index + offset;
-    if (state.config_tabs[index] == nil or state.config_tabs[target] == nil) then
+    if (window_row.tabs[index] == nil or window_row.tabs[target] == nil) then
         return;
     end
 
-    state.config_tabs[index], state.config_tabs[target] = state.config_tabs[target], state.config_tabs[index];
+    window_row.tabs[index], window_row.tabs[target] = window_row.tabs[target], window_row.tabs[index];
     mark_config_dirty();
 end
 
-local function remove_config_tab(index)
-    if (#state.config_tabs <= 1 or state.config_tabs[index] == nil) then
+local function remove_config_tab(window_index, index)
+    local window_row = state.config_windows[window_index];
+    if (window_row == nil or #window_row.tabs <= 1 or window_row.tabs[index] == nil) then
         return;
     end
 
-    table.remove(state.config_tabs, index);
+    table.remove(window_row.tabs, index);
     mark_config_dirty();
 end
 
-local function render_config_filter_checkbox(row, index, filter)
+local function render_config_filter_checkbox(row, window_index, tab_index, filter)
     local enabled = row.filters[filter] == true;
-    if (imgui.Checkbox(('%s##ashitachat_config_tab_%d_filter_%s'):fmt(filter, index, filter), { enabled })) then
+    if (imgui.Checkbox(('%s##ashitachat_config_window_%d_tab_%d_filter_%s'):fmt(filter, window_index, tab_index, filter), { enabled })) then
         local next_enabled = not enabled;
         row.filters[filter] = next_enabled;
 
@@ -1156,42 +1444,42 @@ local function render_config_filter_checkbox(row, index, filter)
     end
 end
 
-local function render_config_mode_checkbox(row, index, mode_filter)
+local function render_config_mode_checkbox(row, window_index, tab_index, mode_filter)
     local enabled = mode_group_enabled(row, mode_filter.modes);
-    if (imgui.Checkbox(('%s##ashitachat_config_tab_%d_mode_%s'):fmt(mode_filter.label, index, mode_filter.key), { enabled })) then
+    if (imgui.Checkbox(('%s##ashitachat_config_window_%d_tab_%d_mode_%s'):fmt(mode_filter.label, window_index, tab_index, mode_filter.key), { enabled })) then
         set_mode_group_enabled(row, mode_filter.modes, not enabled);
         mark_config_dirty();
     end
 end
 
-local function render_config_tab_editor(index, row)
+local function render_config_tab_editor(window_index, index, row)
     imgui.Separator();
     imgui.TextColored(COLORS.tab_text, ('Tab %d'):fmt(index));
     imgui.SameLine(0, 8);
-    if (imgui.Button(('Up##ashitachat_config_tab_%d_up'):fmt(index), { 42, 0 })) then
-        move_config_tab(index, -1);
+    if (imgui.Button(('Up##ashitachat_config_window_%d_tab_%d_up'):fmt(window_index, index), { 42, 0 })) then
+        move_config_tab(window_index, index, -1);
         return;
     end
     imgui.SameLine(0, 4);
-    if (imgui.Button(('Down##ashitachat_config_tab_%d_down'):fmt(index), { 54, 0 })) then
-        move_config_tab(index, 1);
+    if (imgui.Button(('Down##ashitachat_config_window_%d_tab_%d_down'):fmt(window_index, index), { 54, 0 })) then
+        move_config_tab(window_index, index, 1);
         return;
     end
     imgui.SameLine(0, 4);
-    if (imgui.Button(('Remove##ashitachat_config_tab_%d_remove'):fmt(index), { 70, 0 })) then
-        remove_config_tab(index);
+    if (imgui.Button(('Remove##ashitachat_config_window_%d_tab_%d_remove'):fmt(window_index, index), { 70, 0 })) then
+        remove_config_tab(window_index, index);
         return;
     end
 
     imgui.PushItemWidth(160);
-    if (imgui.InputText(('Key##ashitachat_config_tab_%d_key'):fmt(index), row.key_buffer, 32)) then
+    if (imgui.InputText(('Key##ashitachat_config_window_%d_tab_%d_key'):fmt(window_index, index), row.key_buffer, 32)) then
         mark_config_dirty();
     end
     imgui.PopItemWidth();
 
     imgui.SameLine(0, 12);
     imgui.PushItemWidth(220);
-    if (imgui.InputText(('Label##ashitachat_config_tab_%d_label'):fmt(index), row.label_buffer, 48)) then
+    if (imgui.InputText(('Label##ashitachat_config_window_%d_tab_%d_label'):fmt(window_index, index), row.label_buffer, 48)) then
         mark_config_dirty();
     end
     imgui.PopItemWidth();
@@ -1201,7 +1489,7 @@ local function render_config_tab_editor(index, row)
         if (filter_index > 1) then
             imgui.SameLine(0, 8);
         end
-        render_config_filter_checkbox(row, index, filter);
+        render_config_filter_checkbox(row, window_index, index, filter);
     end
 
     imgui.TextColored(COLORS.status, 'Modes');
@@ -1210,18 +1498,78 @@ local function render_config_tab_editor(index, row)
         if (mode_index > 1 and ((mode_index - 1) % 4) ~= 0) then
             imgui.SameLine(0, 8);
         end
-        render_config_mode_checkbox(row, index, mode_filter);
+        render_config_mode_checkbox(row, window_index, index, mode_filter);
     end
 
     imgui.PushItemWidth(520);
-    if (imgui.InputText(('Mode IDs##ashitachat_config_tab_%d_modes'):fmt(index), row.modes_buffer, 128)) then
+    if (imgui.InputText(('Mode IDs##ashitachat_config_window_%d_tab_%d_modes'):fmt(window_index, index), row.modes_buffer, 128)) then
         sync_row_mode_map(row);
         mark_config_dirty();
     end
-    if (imgui.InputText(('Contains##ashitachat_config_tab_%d_contains'):fmt(index), row.contains_buffer, 256)) then
+    if (imgui.InputText(('Contains##ashitachat_config_window_%d_tab_%d_contains'):fmt(window_index, index), row.contains_buffer, 256)) then
         mark_config_dirty();
     end
     imgui.PopItemWidth();
+end
+
+local function render_config_window_selector()
+    for index, row in ipairs(state.config_windows) do
+        if (index > 1) then
+            imgui.SameLine(0, 2);
+        end
+
+        local label = trim_string(row.label_buffer and row.label_buffer[1] or '');
+        if (label == '') then
+            label = ('Window %d'):fmt(index);
+        end
+
+        local active = state.config_selected_window == index;
+        push_tab_style(active);
+        if (imgui.Button(('%s##ashitachat_config_select_window_%d'):fmt(label, index), { 112, 20 })) then
+            state.config_selected_window = index;
+        end
+        pop_tab_style();
+    end
+end
+
+local function render_config_window_editor(index, row)
+    imgui.TextColored(COLORS.tab_text, ('Window %d'):fmt(index));
+    imgui.SameLine(0, 8);
+    if (imgui.Button(('Up##ashitachat_config_window_%d_up'):fmt(index), { 42, 0 })) then
+        move_config_window(index, -1);
+        return false;
+    end
+    imgui.SameLine(0, 4);
+    if (imgui.Button(('Down##ashitachat_config_window_%d_down'):fmt(index), { 54, 0 })) then
+        move_config_window(index, 1);
+        return false;
+    end
+    imgui.SameLine(0, 4);
+    if (imgui.Button(('Remove##ashitachat_config_window_%d_remove'):fmt(index), { 70, 0 })) then
+        remove_config_window(index);
+        return false;
+    end
+    imgui.SameLine(0, 10);
+    local visible = row.visible ~= false;
+    if (imgui.Checkbox(('Visible##ashitachat_config_window_%d_visible'):fmt(index), { visible })) then
+        row.visible = not visible;
+        mark_config_dirty();
+    end
+
+    imgui.PushItemWidth(160);
+    if (imgui.InputText(('Key##ashitachat_config_window_%d_key'):fmt(index), row.key_buffer, 32)) then
+        mark_config_dirty();
+    end
+    imgui.PopItemWidth();
+
+    imgui.SameLine(0, 12);
+    imgui.PushItemWidth(220);
+    if (imgui.InputText(('Label##ashitachat_config_window_%d_label'):fmt(index), row.label_buffer, 48)) then
+        mark_config_dirty();
+    end
+    imgui.PopItemWidth();
+
+    return true;
 end
 
 local function render_config_window()
@@ -1229,11 +1577,18 @@ local function render_config_window()
         return;
     end
 
-    imgui.SetNextWindowSize({ 720, 520 }, IMGUI.cond_first_use);
+    imgui.SetNextWindowSize({ 760, 560 }, IMGUI.cond_first_use);
     local flags = bit.bor(IMGUI.window_no_collapse, IMGUI.window_always_auto_resize);
     if (imgui.Begin('AshitaChat Configuration###AshitaChatConfig', state.config_visible, flags)) then
+        local window_index, window_row = selected_config_window();
+
+        if (imgui.Button('Add Window##ashitachat_config_add_window')) then
+            add_config_window();
+            window_index, window_row = selected_config_window();
+        end
+        imgui.SameLine(0, 8);
         if (imgui.Button('Add Tab##ashitachat_config_add_tab')) then
-            add_config_tab();
+            add_config_tab(window_index);
         end
         imgui.SameLine(0, 8);
         if (imgui.Button('Apply##ashitachat_config_apply')) then
@@ -1274,14 +1629,20 @@ local function render_config_window()
         imgui.Separator();
         imgui.TextColored(COLORS.status, config_file_path());
 
-        local child_open, child_visible = begin_child('##ashitachat_config_tab_list', { 0, 420 }, true);
-        if (child_visible) then
-            for index, row in ipairs(state.config_tabs) do
-                render_config_tab_editor(index, row);
+        render_config_window_selector();
+        imgui.Separator();
+
+        window_index, window_row = selected_config_window();
+        if (window_row ~= nil and render_config_window_editor(window_index, window_row)) then
+            local child_open, child_visible = begin_child('##ashitachat_config_tab_list', { 0, 390 }, true);
+            if (child_visible) then
+                for index, row in ipairs(window_row.tabs) do
+                    render_config_tab_editor(window_index, index, row);
+                end
             end
-        end
-        if (child_open) then
-            imgui.EndChild();
+            if (child_open) then
+                imgui.EndChild();
+            end
         end
     end
     imgui.End();
@@ -1313,11 +1674,55 @@ local function mode_summary()
     return table.concat(parts, ', ');
 end
 
+local function total_tab_count()
+    local count = 0;
+    for _, window in ipairs(state.windows) do
+        count = count + #window.tabs;
+    end
+
+    return count;
+end
+
+local function visible_window_count()
+    local count = 0;
+    for _, window in ipairs(state.windows) do
+        if (window.visible[1] == true) then
+            count = count + 1;
+        end
+    end
+
+    return count;
+end
+
+local function ensure_any_window_visible()
+    if (#state.windows == 0) then
+        return;
+    end
+
+    if (visible_window_count() == 0) then
+        state.windows[1].visible[1] = true;
+    end
+end
+
+local function selected_tabs_summary()
+    local parts = {};
+    for _, window in ipairs(state.windows) do
+        table.insert(parts, ('%s:%s'):fmt(window.key, window.selected_tab or 'none'));
+    end
+
+    if (#parts == 0) then
+        return 'none';
+    end
+
+    return table.concat(parts, ', ');
+end
+
 local function set_hidden(hidden)
     state.hide_native = hidden == true;
 
     if (state.hide_native) then
         state.ui_visible[1] = true;
+        ensure_any_window_visible();
         find_legacy_chat_windows();
         if (state.pointer_error ~= nil) then
             log_warn('Native chat lines are blocked, but legacy chat window pinning is unavailable: ' .. state.pointer_error .. '.');
@@ -1329,8 +1734,28 @@ local function set_hidden(hidden)
     end
 end
 
-local function print_tabs()
-    for _, tab in ipairs(state.tabs) do
+local function print_windows()
+    for _, window in ipairs(state.windows) do
+        log_info(('%d. %s (%s): %s, tabs=%d, selected=%s'):fmt(
+            window.index,
+            window.label,
+            window.key,
+            window.visible[1] and 'visible' or 'hidden',
+            #window.tabs,
+            window.selected_tab or 'none'));
+    end
+end
+
+local function print_tabs(window)
+    if (window == nil) then
+        for _, entry in ipairs(state.windows) do
+            log_info(('%s (%s) tabs:'):fmt(entry.label, entry.key));
+            print_tabs(entry);
+        end
+        return;
+    end
+
+    for _, tab in ipairs(window.tabs) do
         log_info(('%d. %s (%s): %s'):fmt(tab.index, tab.label, tab.key, filters_summary(tab)));
     end
 end
@@ -1340,22 +1765,26 @@ local function print_help()
     log_info('/ashitachat hide - Block non-injected incoming chat lines from the native log.');
     log_info('/ashitachat show - Stop blocking native chat lines.');
     log_info('/ashitachat toggle - Toggle native chat-line blocking.');
-    log_info('/ashitachat ui - Toggle the replacement chat window.');
+    log_info('/ashitachat ui - Toggle all replacement chat windows.');
+    log_info('/ashitachat window <key|number> [show|hide|toggle] - Change one replacement chat window.');
     log_info('/ashitachat config - Toggle the in-game tab configuration window.');
     log_info('/ashitachat clear - Clear the replacement chat buffer.');
-    log_info('/ashitachat tab <key|number> - Switch replacement chat tabs.');
-    log_info('/ashitachat tabs - List configured replacement chat tabs.');
+    log_info('/ashitachat tab <tab> [window] - Switch replacement chat tabs.');
+    log_info('/ashitachat tabs [window] - List configured replacement chat tabs.');
+    log_info('/ashitachat windows - List configured replacement chat windows.');
     log_info('/ashitachat reload - Reload ashitachat_config.lua.');
     log_info('/ashitachat status - Show trial status, pin count, and blocked-line count.');
 end
 
 local function print_status()
     log_info(string.format(
-        'Status: nativeChat=%s, overlay=%s, tab=%s, tabs=%d, config=%s, bufferedLines=%d, blockedLines=%d, pins=%d, pointers=%s, modes=%s.',
+        'Status: nativeChat=%s, overlay=%s, windows=%d/%d visible, tabs=%d, selected=%s, config=%s, bufferedLines=%d, blockedLines=%d, pins=%d, pointers=%s, modes=%s.',
         state.hide_native and 'hidden' or 'visible',
         state.ui_visible[1] and 'visible' or 'hidden',
-        state.selected_tab,
-        #state.tabs,
+        visible_window_count(),
+        #state.windows,
+        total_tab_count(),
+        selected_tabs_summary(),
         state.config_error == nil and 'ready' or 'defaulted',
         #state.messages,
         state.blocked_count,
@@ -1376,11 +1805,14 @@ ashita.events.register('unload', 'unload_cb', function ()
     state.hide_native = false;
     state.ui_visible[1] = false;
     state.config_visible[1] = false;
+    for _, window in ipairs(state.windows) do
+        window.visible[1] = false;
+    end
 end);
 
 ashita.events.register('d3d_present', 'present_cb', function ()
     pin_legacy_chat_closed();
-    render_chat_window();
+    render_chat_windows();
     render_config_window();
 end);
 
@@ -1402,30 +1834,81 @@ ashita.events.register('command', 'command_cb', function (e)
         set_hidden(false);
     elseif (action == 'toggle') then
         set_hidden(not state.hide_native);
-    elseif (action == 'ui' or action == 'window') then
+    elseif (action == 'ui') then
         state.ui_visible[1] = not state.ui_visible[1];
-        log_info('Replacement chat window is now ' .. (state.ui_visible[1] and 'visible.' or 'hidden.'));
+        if (state.ui_visible[1]) then
+            ensure_any_window_visible();
+        end
+        log_info('Replacement chat windows are now ' .. (state.ui_visible[1] and 'visible.' or 'hidden.'));
+    elseif (action == 'window') then
+        local window = find_window(args[3]);
+        if (args[3] == nil) then
+            state.ui_visible[1] = not state.ui_visible[1];
+            if (state.ui_visible[1]) then
+                ensure_any_window_visible();
+            end
+            log_info('Replacement chat windows are now ' .. (state.ui_visible[1] and 'visible.' or 'hidden.'));
+        elseif (window == nil) then
+            log_warn('Unknown window. Use /ashitachat windows to list configured windows.');
+        else
+            local mode = args[4] and args[4]:lower() or 'toggle';
+            if (mode == 'show' or mode == 'on') then
+                window.visible[1] = true;
+            elseif (mode == 'hide' or mode == 'off') then
+                window.visible[1] = false;
+            else
+                window.visible[1] = not window.visible[1];
+            end
+            if (window.visible[1]) then
+                state.ui_visible[1] = true;
+            end
+            log_info(('%s chat window is now %s.'):fmt(window.label, window.visible[1] and 'visible' or 'hidden'));
+        end
     elseif (action == 'config' or action == 'settings') then
+        local window = find_window(args[3]);
+        if (window ~= nil) then
+            state.config_selected_window = window.index or 1;
+        end
         state.config_visible[1] = not state.config_visible[1];
         log_info('Configuration window is now ' .. (state.config_visible[1] and 'visible.' or 'hidden.'));
     elseif (action == 'clear') then
         state.messages = {};
-        state.scroll_to_bottom = true;
+        mark_windows_scroll_to_bottom();
         log_info('Replacement chat buffer cleared.');
     elseif (action == 'tab') then
-        local tab = find_tab(args[3]);
+        local window = state.windows[1];
+        local tab_arg = args[3];
+        local first_window = find_window(args[3]);
+        if (first_window ~= nil and args[4] ~= nil) then
+            window = first_window;
+            tab_arg = args[4];
+        elseif (args[4] ~= nil) then
+            local second_window = find_window(args[4]);
+            if (second_window ~= nil) then
+                window = second_window;
+            end
+        end
+
+        local tab = find_tab(window, tab_arg);
         if (tab == nil) then
-            log_warn('Unknown tab. Use /ashitachat tabs to list configured tabs.');
+            log_warn('Unknown tab. Use /ashitachat tabs [window] to list configured tabs.');
         else
-            state.selected_tab = tab.key;
-            state.scroll_to_bottom = true;
-            log_info('Replacement chat tab set to ' .. tab.label .. '.');
+            window.selected_tab = tab.key;
+            window.scroll_to_bottom = true;
+            log_info(('%s chat tab set to %s.'):fmt(window.label, tab.label));
         end
     elseif (action == 'tabs') then
-        print_tabs();
+        local window = find_window(args[3]);
+        if (args[3] ~= nil and window == nil) then
+            log_warn('Unknown window. Use /ashitachat windows to list configured windows.');
+        else
+            print_tabs(window);
+        end
+    elseif (action == 'windows') then
+        print_windows();
     elseif (action == 'reload') then
         load_config();
-        log_info(('Reloaded %d configured replacement chat tabs.'):fmt(#state.tabs));
+        log_info(('Reloaded %d configured replacement chat windows with %d total tabs.'):fmt(#state.windows, total_tab_count()));
         if (state.config_error ~= nil) then
             log_warn('Using default tab config because ashitachat_config.lua did not load: ' .. state.config_error);
         end
