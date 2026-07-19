@@ -24,9 +24,10 @@ it only captures non-injected incoming chat text and renders it locally. Injecte
 addon/status output is left out of the replacement buffer so verbose addon
 configuration/status lines do not flood the chat tabs.
 
-Tabs are configured in `ashitachat/ashitachat_config.lua`. The default config
-matches the current behavior, and tab order is the order of entries in that
-file:
+Tabs can be configured in game with `/ashitachat config`. The configuration
+window can add, remove, rename, reorder, apply, and save tab definitions. Save
+writes `ashitachat/ashitachat_config.lua`, and tab order is the order of entries
+in that file:
 
 ```lua
 return {
@@ -82,6 +83,7 @@ Then load in game:
 /ashitachat show
 /ashitachat toggle
 /ashitachat ui
+/ashitachat config
 /ashitachat clear
 /ashitachat tab general
 /ashitachat tab combat
