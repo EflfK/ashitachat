@@ -32,22 +32,33 @@ local IMGUI = {
 };
 
 local COLORS = {
-    panel_bg = { 0.010, 0.010, 0.010, 0.96 },
-    child_bg = { 0.000, 0.000, 0.000, 0.88 },
-    border = { 0.70, 0.44, 0.18, 1.00 },
-    tab = { 0.075, 0.055, 0.050, 0.98 },
-    tab_hover = { 0.145, 0.085, 0.050, 0.98 },
-    tab_active = { 0.240, 0.125, 0.045, 1.00 },
-    frame = { 0.015, 0.015, 0.015, 0.98 },
-    frame_hover = { 0.080, 0.065, 0.045, 0.96 },
-    tab_text = { 0.98, 0.72, 0.22, 1.00 },
-    timestamp = { 0.80, 0.82, 0.86, 1.00 },
-    general = { 0.96, 0.96, 0.98, 1.00 },
-    combat = { 1.00, 0.76, 0.46, 1.00 },
-    group = { 0.50, 0.92, 1.00, 1.00 },
-    lfg = { 1.00, 0.93, 0.12, 1.00 },
-    status = { 0.82, 0.82, 0.86, 1.00 },
-    empty = { 0.62, 0.62, 0.66, 1.00 },
+    panel_bg = { 0.000, 0.000, 0.000, 0.74 },
+    child_bg = { 0.000, 0.000, 0.000, 0.00 },
+    border = { 0.28, 0.28, 0.30, 0.78 },
+    tab = { 0.015, 0.015, 0.018, 0.86 },
+    tab_hover = { 0.095, 0.095, 0.105, 0.92 },
+    tab_active = { 0.165, 0.165, 0.180, 0.98 },
+    frame = { 0.000, 0.000, 0.000, 0.58 },
+    frame_hover = { 0.070, 0.070, 0.075, 0.78 },
+    tab_text = { 0.78, 0.78, 0.82, 1.00 },
+    tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
+    timestamp = { 0.58, 0.58, 0.62, 1.00 },
+    general = { 0.93, 0.93, 0.93, 1.00 },
+    say = { 0.93, 0.93, 0.93, 1.00 },
+    shout = { 1.00, 0.48, 0.92, 1.00 },
+    yell = { 1.00, 0.82, 0.30, 1.00 },
+    tell = { 1.00, 0.58, 1.00, 1.00 },
+    party = { 0.55, 0.86, 1.00, 1.00 },
+    linkshell = { 0.50, 1.00, 0.48, 1.00 },
+    linkshell2 = { 0.55, 1.00, 0.78, 1.00 },
+    assist = { 0.62, 0.80, 1.00, 1.00 },
+    emote = { 0.82, 0.72, 1.00, 1.00 },
+    system = { 1.00, 0.92, 0.48, 1.00 },
+    combat = { 1.00, 0.72, 0.38, 1.00 },
+    group = { 0.55, 0.86, 1.00, 1.00 },
+    lfg = { 1.00, 0.92, 0.28, 1.00 },
+    status = { 0.62, 0.62, 0.66, 1.00 },
+    empty = { 0.50, 0.50, 0.54, 1.00 },
     success = { 0.42, 0.95, 0.55, 1.00 },
     error = { 1.00, 0.36, 0.32, 1.00 },
 };
@@ -77,7 +88,7 @@ local MODE_LABELS = {
     [5] = 'party',
     [6] = 'linkshell',
     [8] = 'emote',
-    [10] = 'yell',
+    [10] = 'shout',
     [11] = 'yell',
     [12] = 'tell',
     [13] = 'party',
@@ -87,6 +98,39 @@ local MODE_LABELS = {
     [213] = 'linkshell2',
     [214] = 'linkshell2',
     [217] = 'linkshell2',
+    [9] = 'say',
+    [11] = 'yell',
+    [29] = 'system',
+    [121] = 'system',
+    [212] = 'unity',
+    [220] = 'assist',
+    [222] = 'assist',
+};
+
+local MODE_COLORS = {
+    [1] = COLORS.say,
+    [9] = COLORS.say,
+    [2] = COLORS.shout,
+    [3] = COLORS.shout,
+    [10] = COLORS.shout,
+    [11] = COLORS.yell,
+    [4] = COLORS.tell,
+    [12] = COLORS.tell,
+    [5] = COLORS.party,
+    [13] = COLORS.party,
+    [210] = COLORS.party,
+    [6] = COLORS.linkshell,
+    [14] = COLORS.linkshell,
+    [205] = COLORS.linkshell,
+    [213] = COLORS.linkshell2,
+    [214] = COLORS.linkshell2,
+    [217] = COLORS.linkshell2,
+    [8] = COLORS.emote,
+    [29] = COLORS.system,
+    [121] = COLORS.system,
+    [212] = COLORS.linkshell2,
+    [220] = COLORS.assist,
+    [222] = COLORS.assist,
 };
 
 local COMBAT_MODES = {};
@@ -124,7 +168,7 @@ local state = {
     messages = {},
     message_seq = 0,
     max_messages = 300,
-    font_scale = 1.12,
+    font_scale = 1.00,
     scroll_to_bottom = true,
     blocked_count = 0,
     pin_count = 0,
@@ -628,6 +672,10 @@ local function chat_mode(e)
     return bit.band(tonumber(e.mode) or 0, 0x000000FF);
 end
 
+local function chat_display_mode(e)
+    return bit.band(tonumber(e.mode_modified or e.mode) or 0, 0x000000FF);
+end
+
 local function clean_message(message)
     local text = tostring(message or ''):gsub('\r', ' '):gsub('\n', ' '):gsub('%z', '');
 
@@ -682,16 +730,11 @@ local function classify_message(mode, text)
 end
 
 local function display_text(mode, text)
-    local label = MODE_LABELS[mode];
-    if (label == nil or text:find('^%[') ~= nil or text:find('^%(') ~= nil) then
-        return text;
-    end
-
-    return ('[%s] %s'):fmt(label, text);
+    return text;
 end
 
-local function category_color(category)
-    return COLORS[category] or COLORS.general;
+local function message_color(mode, category)
+    return MODE_COLORS[mode] or COLORS[category] or COLORS.general;
 end
 
 local function normalized_search()
@@ -719,7 +762,7 @@ local function message_matches_tab(message, tab)
         return true;
     end
 
-    if ((tab.mode_map or {})[message.mode] == true) then
+    if ((tab.mode_map or {})[message.mode] == true or (tab.mode_map or {})[message.display_mode] == true) then
         return true;
     end
 
@@ -738,7 +781,8 @@ local function append_message(e)
     end
 
     local mode = chat_mode(e);
-    if (mode == 150 or mode == 151 or mode == 152) then
+    local display_mode = chat_display_mode(e);
+    if (mode == 150 or mode == 151 or mode == 152 or display_mode == 150 or display_mode == 151 or display_mode == 152) then
         return false;
     end
 
@@ -747,19 +791,20 @@ local function append_message(e)
         return false;
     end
 
-    local category = classify_message(mode, text);
-    local display = display_text(mode, text);
+    local category = classify_message(display_mode, text);
+    local display = display_text(display_mode, text);
 
     state.message_seq = state.message_seq + 1;
     table.insert(state.messages, {
         id = state.message_seq,
         time = os.date('%H:%M:%S'),
         mode = mode,
+        display_mode = display_mode,
         category = category,
         text = text,
         display = display,
         search_text = (display .. ' ' .. text):lower(),
-        color = category_color(category),
+        color = message_color(display_mode, category),
     });
 
     while (#state.messages > state.max_messages) do
@@ -831,9 +876,9 @@ end
 
 local function push_tab_style(active)
     imgui.PushStyleColor(IMGUI.col_button, active and COLORS.tab_active or COLORS.tab);
-    imgui.PushStyleColor(IMGUI.col_button_hovered, active and COLORS.tab_active or COLORS.tab_hover);
+    imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.tab_hover);
     imgui.PushStyleColor(IMGUI.col_button_active, COLORS.tab_active);
-    imgui.PushStyleColor(IMGUI.col_text, COLORS.tab_text);
+    imgui.PushStyleColor(IMGUI.col_text, active and COLORS.tab_text_active or COLORS.tab_text);
 end
 
 local function pop_tab_style()
@@ -843,12 +888,12 @@ end
 local function render_tabs()
     for index, tab in ipairs(state.tabs) do
         if (index > 1) then
-            imgui.SameLine(0, 4);
+            imgui.SameLine(0, 2);
         end
 
         local active = state.selected_tab == tab.key;
         push_tab_style(active);
-        if (imgui.Button(('%s##ashitachat_tab_%s'):fmt(tab.label, tab.key), { 104, 24 })) then
+        if (imgui.Button(('%s##ashitachat_tab_%s'):fmt(tab.label, tab.key), { 98, 20 })) then
             state.selected_tab = tab.key;
             state.scroll_to_bottom = true;
         end
@@ -862,13 +907,13 @@ local function render_search()
         imgui.SameLine(0, 14);
     end
 
-    imgui.PushItemWidth(170);
+    imgui.PushItemWidth(160);
     imgui.InputText('##ashitachat_search', state.search_buffer, 64);
     imgui.PopItemWidth();
 
     if (trim_string(state.search_buffer[1]) ~= '') then
         imgui.SameLine(0, 4);
-        if (imgui.Button('x##ashitachat_search_clear', { 22, 22 })) then
+        if (imgui.Button('x##ashitachat_search_clear', { 20, 20 })) then
             buffer_set(state.search_buffer, '');
             state.scroll_to_bottom = true;
         end
@@ -911,7 +956,7 @@ end
 local function render_message_list()
     local query = normalized_search();
     local selected_tab = state.tab_by_key[state.selected_tab] or state.tabs[1];
-    local child_open, child_visible = begin_child('##ashitachat_message_list', { 0, -26 }, true);
+    local child_open, child_visible = begin_child('##ashitachat_message_list', { 0, -24 }, false);
     local visible_count = 0;
 
     if (child_visible) then
@@ -946,14 +991,14 @@ end
 
 local function render_footer(visible_count)
     imgui.TextColored(COLORS.status, ('%d shown / %d buffered'):fmt(visible_count, #state.messages));
-    imgui.SameLine(0, 12);
+    imgui.SameLine(0, 10);
     imgui.TextColored(COLORS.status, state.hide_native and 'native hidden' or 'native visible');
-    imgui.SameLine(0, 12);
-    if (imgui.Button('v##ashitachat_scroll_bottom', { 24, 0 })) then
+    imgui.SameLine(0, 10);
+    if (imgui.Button('v##ashitachat_scroll_bottom', { 22, 0 })) then
         state.scroll_to_bottom = true;
     end
     imgui.SameLine(0, 6);
-    if (imgui.Button('cfg##ashitachat_open_config', { 36, 0 })) then
+    if (imgui.Button('cfg##ashitachat_open_config', { 34, 0 })) then
         state.config_visible[1] = true;
     end
 end
@@ -964,11 +1009,11 @@ local function render_chat_window()
     end
 
     local window_flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
-    imgui.SetNextWindowPos({ 18, 520 }, IMGUI.cond_first_use);
-    imgui.SetNextWindowSize({ 840, 340 }, IMGUI.cond_first_use);
-    imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 6 });
+    imgui.SetNextWindowPos({ 18, 528 }, IMGUI.cond_first_use);
+    imgui.SetNextWindowSize({ 840, 310 }, IMGUI.cond_first_use);
+    imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
-    imgui.PushStyleVar(IMGUI.style_frame_padding, { 8, 5 });
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
     imgui.PushStyleColor(IMGUI.col_window_bg, COLORS.panel_bg);
     imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
     imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
