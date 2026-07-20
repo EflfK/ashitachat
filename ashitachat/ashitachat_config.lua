@@ -4,6 +4,10 @@ return {
             key = 'main',
             label = 'Main',
             visible = true,
+            window_x = 18,
+            window_y = 528,
+            window_width = 840,
+            window_height = 310,
             tabs = {
                 -- Reorder tabs by moving these entries. Add more entries with
                 -- the same shape to create new tabs in this window.

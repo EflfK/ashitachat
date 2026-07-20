@@ -11,6 +11,28 @@ $backupRoot = Join-Path $PSScriptRoot ".local-backups"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backup = Join-Path $backupRoot $timestamp
 
+function Save-ConfigMigration {
+    param(
+        [Parameter(Mandatory)][string]$InstalledAddonPath,
+        [Parameter(Mandatory)][string]$AshitaRoot
+    )
+
+    $legacyConfig = Join-Path $InstalledAddonPath "ashitachat_config.lua"
+    if (-not (Test-Path -LiteralPath $legacyConfig)) {
+        return
+    }
+
+    $configRoot = Join-Path $AshitaRoot "config\addons\ashitachat"
+    $runtimeConfig = Join-Path $configRoot "ashitachat_config.lua"
+    if (Test-Path -LiteralPath $runtimeConfig) {
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
+    Copy-Item -LiteralPath $legacyConfig -Destination $runtimeConfig -Force
+    Write-Host "Migrated ashitachat config to: $runtimeConfig"
+}
+
 if (-not (Test-Path -LiteralPath $source)) {
     throw "Source addon folder does not exist: $source"
 }
@@ -20,6 +42,8 @@ if (-not (Test-Path -LiteralPath $AshitaRoot)) {
 }
 
 if (Test-Path -LiteralPath $target) {
+    Save-ConfigMigration -InstalledAddonPath $target -AshitaRoot $AshitaRoot
+
     New-Item -ItemType Directory -Force -Path $backup | Out-Null
     Copy-Item -LiteralPath $target -Destination (Join-Path $backup "ashitachat") -Recurse -Force
 

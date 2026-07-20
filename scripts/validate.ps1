@@ -14,6 +14,7 @@ foreach ($path in @($addon, $config, $readme, $install)) {
 
 $lua = Get-Content -LiteralPath $addon -Raw
 $configLua = Get-Content -LiteralPath $config -Raw
+$installContent = Get-Content -LiteralPath $install -Raw
 
 $required = @(
     "addon.name = 'ashitachat'",
@@ -38,6 +39,15 @@ $required = @(
     "message_color(display_mode, category)",
     "render_config_window()",
     "render_config_mode_checkbox(row, window_index, tab_index, mode_filter)",
+    "path_join(install_path, 'config')",
+    "path_join(config_root, 'addons')",
+    "window.window_x",
+    "window.window_width",
+    "track_window_layout(window)",
+    "ensure_config_dir()",
+    "legacy_config_file_path()",
+    "migrate_legacy_config()",
+    "load_lua_config_file(path)",
     "save_config()",
     "config_file_path()",
     "if (is_injected(e)) then",
@@ -64,6 +74,10 @@ foreach ($needle in $required) {
 $requiredConfig = @(
     "windows = {",
     "key = 'main'",
+    "window_x = 18",
+    "window_y = 528",
+    "window_width = 840",
+    "window_height = 310",
     "tabs = {",
     "filters = { 'all' }",
     "filters = { 'combat' }",
@@ -76,6 +90,19 @@ $requiredConfig = @(
 foreach ($needle in $requiredConfig) {
     if (-not $configLua.Contains($needle)) {
         throw "Expected pattern not found in config: $needle"
+    }
+}
+
+$requiredInstall = @(
+    "Save-ConfigMigration",
+    "config\addons\ashitachat",
+    "ashitachat_config.lua",
+    "Migrated ashitachat config to:"
+)
+
+foreach ($needle in $requiredInstall) {
+    if (-not $installContent.Contains($needle)) {
+        throw "Expected pattern not found in installer: $needle"
     }
 }
 

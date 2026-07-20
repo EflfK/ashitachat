@@ -33,8 +33,8 @@ Windows and tabs can be configured in game with `/ashitachat config`. The
 configuration window can add, remove, rename, reorder, apply, and save window
 definitions. Each configured chat window has its own configuration tab, and the
 selected window editor manages that window's chat tabs. Save writes
-`ashitachat/ashitachat_config.lua`, and render order is the order of entries in
-that file:
+`Ashita/config/addons/ashitachat/ashitachat_config.lua`, outside the addon
+folder, and render order is the order of entries in that file:
 
 ```lua
 return {
@@ -43,6 +43,10 @@ return {
             key = 'main',
             label = 'Main',
             visible = true,
+            window_x = 18,
+            window_y = 528,
+            window_width = 840,
+            window_height = 310,
             tabs = {
                 { key = 'general', label = 'General', filters = { 'all' } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
@@ -61,6 +65,11 @@ common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
 field for exact/custom IDs. `contains` matches case-insensitive text fragments.
 Legacy configs with top-level `tabs = { ... }` still load as a single Main
 window.
+
+Each window also stores `window_x`, `window_y`, `window_width`, and
+`window_height`. Move or resize the chat window, then click `Save` in
+`/ashitachat config` to persist its placement in the config folder outside the
+addon install.
 
 The addon can also suppress native chat-log lines and pin the legacy chat
 windows closed while chat input is not open.
@@ -81,6 +90,11 @@ From this repository:
 ```powershell
 .\install.ps1
 ```
+
+The installer does not overwrite saved config under
+`Ashita/config/addons/ashitachat/`. If it finds an older installed
+`addons/ashitachat/ashitachat_config.lua` and no saved config exists yet, it
+migrates that file before replacing the addon folder.
 
 Or pass a custom Ashita root:
 

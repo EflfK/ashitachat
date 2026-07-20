@@ -74,6 +74,15 @@ local DEFAULT_WINDOWS = {
     { key = 'main', label = 'Main', visible = true, tabs = DEFAULT_TABS },
 };
 
+local DEFAULT_WINDOW_X = 18;
+local DEFAULT_WINDOW_Y = 528;
+local DEFAULT_WINDOW_WIDTH = 840;
+local DEFAULT_WINDOW_HEIGHT = 310;
+local WINDOW_POSITION_MIN = -2000;
+local WINDOW_POSITION_MAX = 10000;
+local WINDOW_SIZE_MIN = 120;
+local WINDOW_SIZE_MAX = 4000;
+
 local VALID_FILTERS = {
     all = true,
     general = true,
@@ -294,6 +303,22 @@ local function normalize_contains(tab)
     return contains;
 end
 
+local function normalize_int(value, fallback, minimum, maximum)
+    local number = tonumber(value);
+    if (number == nil) then
+        number = fallback;
+    end
+
+    number = math.floor(number + 0.5);
+    if (minimum ~= nil and number < minimum) then
+        number = minimum;
+    elseif (maximum ~= nil and number > maximum) then
+        number = maximum;
+    end
+
+    return number;
+end
+
 local function normalize_tab(raw, index, used_keys)
     local tab = type(raw) == 'table' and raw or {};
     local label = trim_string(tab.label or tab.name);
@@ -359,10 +384,16 @@ local function normalize_window(raw, index, used_keys)
     end
     used_keys[key] = true;
 
+    local offset = (index - 1) * 28;
+
     return {
         key = key,
         label = label,
         visible = T{ source.visible ~= false and source.hidden ~= true },
+        window_x = normalize_int(source.window_x or source.x, DEFAULT_WINDOW_X + offset, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX),
+        window_y = normalize_int(source.window_y or source.y, DEFAULT_WINDOW_Y - offset, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX),
+        window_width = normalize_int(source.window_width or source.width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
+        window_height = normalize_int(source.window_height or source.height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
         tabs = normalize_tabs(source.tabs),
         tab_by_key = {},
         selected_tab = normalize_key(source.selected_tab or source.selected or '', ''),
@@ -413,21 +444,133 @@ local function path_join(left, right)
     return left .. '\\' .. right;
 end
 
-local function config_file_path()
+local function ashita_install_path()
+    local ok, install_path = pcall(function ()
+        return AshitaCore:GetInstallPath();
+    end);
+    install_path = ok and trim_string(install_path) or '';
+    if (install_path == '') then
+        return nil;
+    end
+
+    return install_path;
+end
+
+local function config_dir_path()
+    local install_path = ashita_install_path();
+    if (install_path == nil) then
+        return nil;
+    end
+
+    return path_join(path_join(path_join(install_path, 'config'), 'addons'), addon.name);
+end
+
+local function legacy_config_file_path()
     local addon_path = trim_string(addon.path);
     if (addon_path ~= '') then
         return path_join(addon_path, 'ashitachat_config.lua');
     end
 
-    local ok, install_path = pcall(function ()
-        return AshitaCore:GetInstallPath();
-    end);
-    install_path = ok and trim_string(install_path) or '';
-    if (install_path ~= '') then
+    local install_path = ashita_install_path();
+    if (install_path ~= nil) then
         return path_join(path_join(install_path, 'addons\\ashitachat'), 'ashitachat_config.lua');
     end
 
     return 'ashitachat_config.lua';
+end
+
+local function config_file_path()
+    local dir = config_dir_path();
+    if (dir ~= nil) then
+        return path_join(dir, 'ashitachat_config.lua');
+    end
+
+    return legacy_config_file_path();
+end
+
+local function file_exists(path)
+    if (path == nil or path == '') then
+        return false;
+    end
+
+    local file = io.open(path, 'rb');
+    if (file == nil) then
+        return false;
+    end
+
+    file:close();
+    return true;
+end
+
+local function read_text_file(path)
+    local file, error_message = io.open(path, 'rb');
+    if (file == nil) then
+        return nil, error_message;
+    end
+
+    local contents = file:read('*a');
+    file:close();
+    return contents, nil;
+end
+
+local function write_text_file(path, contents)
+    local file, error_message = io.open(path, 'wb');
+    if (file == nil) then
+        return false, error_message;
+    end
+
+    local ok, write_error = file:write(contents);
+    file:close();
+    if (not ok) then
+        return false, write_error;
+    end
+
+    return true, nil;
+end
+
+local function ensure_config_dir()
+    local install_path = ashita_install_path();
+    if (install_path == nil) then
+        return false, 'Ashita install path is unavailable.';
+    end
+
+    if (ashita == nil or ashita.fs == nil) then
+        return false, 'Ashita filesystem helpers are unavailable.';
+    end
+
+    local config_root = path_join(install_path, 'config');
+    local addons_config_dir = path_join(config_root, 'addons');
+    local dir = path_join(addons_config_dir, addon.name);
+
+    if (not ashita.fs.exists(config_root)) then
+        ashita.fs.create_dir(config_root);
+    end
+    if (not ashita.fs.exists(addons_config_dir)) then
+        ashita.fs.create_dir(addons_config_dir);
+    end
+    if (not ashita.fs.exists(dir)) then
+        ashita.fs.create_dir(dir);
+    end
+
+    return true, dir;
+end
+
+local function load_lua_config_file(path)
+    if (not file_exists(path)) then
+        return false, nil, ('Config file not found: %s'):fmt(tostring(path));
+    end
+
+    local chunk, load_error = loadfile(path);
+    if (chunk == nil) then
+        return false, nil, load_error;
+    end
+
+    local ok, config = pcall(chunk);
+    if (not ok) then
+        return false, nil, config;
+    end
+
+    return true, config, nil;
 end
 
 local function config_string(value)
@@ -602,6 +745,10 @@ local function editor_from_window(window, index)
         key_buffer = T{ window.key or ('window%d'):fmt(index) },
         label_buffer = T{ window.label or ('Window %d'):fmt(index) },
         visible = visible,
+        window_x = window.window_x,
+        window_y = window.window_y,
+        window_width = window.window_width,
+        window_height = window.window_height,
         tabs = tabs,
     };
 end
@@ -646,6 +793,10 @@ local function config_editor_window(row, index)
         key = normalize_key(row.key_buffer and row.key_buffer[1] or '', ('window%d'):fmt(index)),
         label = label,
         visible = row.visible ~= false,
+        window_x = row.window_x,
+        window_y = row.window_y,
+        window_width = row.window_width,
+        window_height = row.window_height,
         tabs = config_editor_tabs(row),
     };
 end
@@ -653,6 +804,15 @@ end
 local function config_editor_windows()
     local windows = {};
     for index, row in ipairs(state.config_windows) do
+        local key = normalize_key(row.key_buffer and row.key_buffer[1] or '', ('window%d'):fmt(index));
+        local runtime = state.window_by_key[key];
+        if (runtime ~= nil) then
+            row.window_x = runtime.window_x;
+            row.window_y = runtime.window_y;
+            row.window_width = runtime.window_width;
+            row.window_height = runtime.window_height;
+        end
+
         table.insert(windows, config_editor_window(row, index));
     end
 
@@ -697,6 +857,10 @@ local function config_text_from_windows(windows)
         table.insert(lines, ('            key = %s,'):fmt(config_string(window.key)));
         table.insert(lines, ('            label = %s,'):fmt(config_string(window.label)));
         table.insert(lines, ('            visible = %s,'):fmt(window_visible_value(window) and 'true' or 'false'));
+        table.insert(lines, ('            window_x = %d,'):fmt(normalize_int(window.window_x, DEFAULT_WINDOW_X, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX)));
+        table.insert(lines, ('            window_y = %d,'):fmt(normalize_int(window.window_y, DEFAULT_WINDOW_Y, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX)));
+        table.insert(lines, ('            window_width = %d,'):fmt(normalize_int(window.window_width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
+        table.insert(lines, ('            window_height = %d,'):fmt(normalize_int(window.window_height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
         table.insert(lines, '            tabs = {');
         for _, tab in ipairs(window.tabs or {}) do
             table.insert(lines, ('                { %s },'):fmt(table.concat(tab_config_fields(tab), ', ')));
@@ -726,13 +890,17 @@ end
 local function save_config()
     local windows = normalize_windows(config_editor_windows());
     local path = config_file_path();
-    local file, error_message = io.open(path, 'w');
-    if (file == nil) then
-        return false, tostring(error_message or 'open failed');
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (dir_ok) then
+        path = path_join(dir_or_error, 'ashitachat_config.lua');
+    elseif (config_dir_path() ~= nil) then
+        return false, ('Save failed: %s'):fmt(tostring(dir_or_error));
     end
 
-    file:write(config_text_from_windows(windows));
-    file:close();
+    local write_ok, write_error = write_text_file(path, config_text_from_windows(windows));
+    if (not write_ok) then
+        return false, tostring(write_error or 'open failed');
+    end
 
     state.windows = windows;
     rebuild_window_lookups();
@@ -826,13 +994,48 @@ local function configured_windows(config)
     return nil;
 end
 
+local function migrate_legacy_config()
+    local path = config_file_path();
+    local legacy_path = legacy_config_file_path();
+    if (legacy_path == path or file_exists(path) or not file_exists(legacy_path)) then
+        return false;
+    end
+
+    local dir_ok = ensure_config_dir();
+    if (not dir_ok) then
+        return false;
+    end
+
+    local contents = read_text_file(legacy_path);
+    if (contents == nil) then
+        return false;
+    end
+
+    local write_ok = write_text_file(path, contents);
+    return write_ok == true;
+end
+
 local function load_config()
     state.config_error = nil;
     package.loaded.ashitachat_config = nil;
 
-    local ok, config = pcall(require, 'ashitachat_config');
+    local path = config_file_path();
+    local ok, config, error_message = false, nil, nil;
+
+    if (not file_exists(path)) then
+        migrate_legacy_config();
+    end
+
+    ok, config, error_message = load_lua_config_file(path);
+    if (not ok and not file_exists(path)) then
+        local legacy_path = legacy_config_file_path();
+        if (legacy_path ~= path) then
+            ok, config, error_message = load_lua_config_file(legacy_path);
+        end
+    end
+
     if (not ok) then
-        state.config_error = tostring(config);
+        state.config_error = tostring(error_message or config);
         state.windows = normalize_windows(DEFAULT_WINDOWS);
     else
         state.windows = normalize_windows(configured_windows(config));
@@ -1154,6 +1357,51 @@ local function window_id(window)
     return window.key or tostring(window.index or 'window');
 end
 
+local function sync_editor_window_layout(window)
+    local row = state.config_windows[window.index or 0];
+    if (row == nil) then
+        return;
+    end
+
+    local key = normalize_key(row.key_buffer and row.key_buffer[1] or '', '');
+    if (key ~= window.key) then
+        return;
+    end
+
+    row.window_x = window.window_x;
+    row.window_y = window.window_y;
+    row.window_width = window.window_width;
+    row.window_height = window.window_height;
+end
+
+local function track_window_layout(window)
+    if (type(imgui.GetWindowPos) == 'function') then
+        local x, y = imgui.GetWindowPos();
+        window.window_x = normalize_int(x, window.window_x or DEFAULT_WINDOW_X, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX);
+        window.window_y = normalize_int(y, window.window_y or DEFAULT_WINDOW_Y, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX);
+    end
+
+    local width, height = nil, nil;
+    if (type(imgui.GetWindowSize) == 'function') then
+        width, height = imgui.GetWindowSize();
+        if (type(width) == 'table') then
+            local size = width;
+            width = size.x or size[1];
+            height = size.y or size[2];
+        end
+    end
+    if (width == nil and type(imgui.GetWindowWidth) == 'function') then
+        width = imgui.GetWindowWidth();
+    end
+    if (height == nil and type(imgui.GetWindowHeight) == 'function') then
+        height = imgui.GetWindowHeight();
+    end
+
+    window.window_width = normalize_int(width, window.window_width or DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX);
+    window.window_height = normalize_int(height, window.window_height or DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX);
+    sync_editor_window_layout(window);
+end
+
 local function render_tabs(window)
     local id = window_id(window);
     for index, tab in ipairs(window.tabs) do
@@ -1282,9 +1530,8 @@ local function render_chat_window(window)
     end
 
     local window_flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
-    local offset = ((window.index or 1) - 1) * 28;
-    imgui.SetNextWindowPos({ 18 + offset, 528 - offset }, IMGUI.cond_first_use);
-    imgui.SetNextWindowSize({ 840, 310 }, IMGUI.cond_first_use);
+    imgui.SetNextWindowPos({ window.window_x, window.window_y }, IMGUI.cond_first_use);
+    imgui.SetNextWindowSize({ window.window_width, window.window_height }, IMGUI.cond_first_use);
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
@@ -1295,6 +1542,8 @@ local function render_chat_window(window)
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
     if (imgui.Begin(('AshitaChat - %s###AshitaChatWindow_%s'):fmt(window.label, window_id(window)), window.visible, window_flags)) then
+        track_window_layout(window);
+
         if (type(imgui.SetWindowFontScale) == 'function') then
             imgui.SetWindowFontScale(state.font_scale);
         end
