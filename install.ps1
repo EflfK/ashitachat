@@ -1,15 +1,21 @@
 param(
     [string]$AshitaRoot = "C:\Games\CatsEyeXI\catseyexi-client\Ashita",
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipAutoload
 )
 
 $ErrorActionPreference = "Stop"
 
 $source = Join-Path $PSScriptRoot "ashitachat"
 $target = Join-Path $AshitaRoot "addons\ashitachat"
+$startupScript = Join-Path $AshitaRoot "scripts\default.txt"
+$startupLoadLine = "/addon load ashitachat"
+$startupHideLine = "/ashitachat hide"
 $backupRoot = Join-Path $PSScriptRoot ".local-backups"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backup = Join-Path $backupRoot $timestamp
+$startupBackup = $null
+$autoloadStatus = "skipped"
 
 function Save-ConfigMigration {
     param(
@@ -31,6 +37,22 @@ function Save-ConfigMigration {
     New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
     Copy-Item -LiteralPath $legacyConfig -Destination $runtimeConfig -Force
     Write-Host "Migrated ashitachat config to: $runtimeConfig"
+}
+
+function Find-StartupLineIndex {
+    param(
+        [Parameter(Mandatory)][string[]]$Lines,
+        [Parameter(Mandatory)][string]$Needle
+    )
+
+    $needleLower = $Needle.ToLowerInvariant()
+    for ($index = 0; $index -lt $Lines.Count; $index++) {
+        if ($Lines[$index].Trim().ToLowerInvariant() -eq $needleLower) {
+            return $index
+        }
+    }
+
+    return -1
 }
 
 if (-not (Test-Path -LiteralPath $source)) {
@@ -58,11 +80,52 @@ if (Test-Path -LiteralPath $target) {
 
 Copy-Item -LiteralPath $source -Destination $target -Recurse -Force
 
+if (-not $SkipAutoload) {
+    if (Test-Path -LiteralPath $startupScript) {
+        $startupLines = @(Get-Content -LiteralPath $startupScript)
+        $loadIndex = Find-StartupLineIndex -Lines $startupLines -Needle $startupLoadLine
+        $hideIndex = Find-StartupLineIndex -Lines $startupLines -Needle $startupHideLine
+        $hideAfterLoad = ($loadIndex -ge 0 -and $hideIndex -gt $loadIndex)
+
+        if ($loadIndex -ge 0 -and $hideAfterLoad) {
+            $autoloadStatus = "startup commands already present in: $startupScript"
+        } else {
+            if (-not (Test-Path -LiteralPath $backup)) {
+                New-Item -ItemType Directory -Force -Path $backup | Out-Null
+            }
+
+            $startupBackup = Join-Path $backup "default.txt"
+            Copy-Item -LiteralPath $startupScript -Destination $startupBackup -Force
+
+            $added = @()
+            if ($loadIndex -lt 0) {
+                Add-Content -LiteralPath $startupScript -Value $startupLoadLine
+                $added += $startupLoadLine
+            }
+            if (-not $hideAfterLoad) {
+                Add-Content -LiteralPath $startupScript -Value $startupHideLine
+                $added += $startupHideLine
+            }
+
+            $autoloadStatus = "added/updated in: $startupScript ($($added -join ', '))"
+        }
+    } else {
+        $autoloadStatus = "not added; startup script not found: $startupScript"
+    }
+}
+
+$startupBackupForRollback = ""
+if ($startupBackup -ne $null) {
+    $startupBackupForRollback = $startupBackup
+}
+
 $rollback = Join-Path $backupRoot "rollback-$timestamp.ps1"
 $rollbackContent = @"
 `$ErrorActionPreference = "Stop"
 `$target = "$target"
 `$backupAddon = "$(Join-Path $backup "ashitachat")"
+`$startupScript = "$startupScript"
+`$startupBackup = "$startupBackupForRollback"
 
 if (Test-Path -LiteralPath `$target) {
     Remove-Item -LiteralPath `$target -Recurse -Force
@@ -74,11 +137,18 @@ if (Test-Path -LiteralPath `$backupAddon) {
 } else {
     Write-Host "Removed ashitachat addon. No previous addon backup was present."
 }
+
+if (`$startupBackup -ne "" -and (Test-Path -LiteralPath `$startupBackup)) {
+    Copy-Item -LiteralPath `$startupBackup -Destination `$startupScript -Force
+    Write-Host "Restored previous Ashita startup script."
+}
 "@
 
 New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 Set-Content -LiteralPath $rollback -Value $rollbackContent -Encoding UTF8
 
 Write-Host "Installed ashitachat addon to: $target"
-Write-Host "Load in game with: /addon load ashitachat"
+Write-Host "Autoload: $autoloadStatus"
+Write-Host "Load now in game with: /addon load ashitachat"
+Write-Host "Hide native chat with: /ashitachat hide"
 Write-Host "Rollback script: $rollback"

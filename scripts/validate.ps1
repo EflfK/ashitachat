@@ -109,7 +109,13 @@ $requiredInstall = @(
     "Save-ConfigMigration",
     "config\addons\ashitachat",
     "ashitachat_config.lua",
-    "Migrated ashitachat config to:"
+    "Migrated ashitachat config to:",
+    "SkipAutoload",
+    "/addon load ashitachat",
+    "/ashitachat hide",
+    "Find-StartupLineIndex",
+    "startup commands already present",
+    "Restored previous Ashita startup script."
 )
 
 foreach ($needle in $requiredInstall) {

@@ -122,7 +122,13 @@ Then load in game:
 
 ```text
 /addon load ashitachat
+/ashitachat hide
 ```
+
+The installer also adds `/addon load ashitachat` followed by `/ashitachat hide`
+to `Ashita\scripts\default.txt` by default so the addon loads at game start and
+immediately suppresses the native chat log. Pass `-SkipAutoload` to copy the
+addon without changing the startup script.
 
 ## Commands
 
