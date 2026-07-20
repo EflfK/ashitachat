@@ -11,18 +11,20 @@ Initial scope:
 
 ## Current Trial
 
-This version renders draggable, resizable ImGui replacement chat windows styled
-to stay close to the native FFXI chat log: a translucent black panel, muted
-square tabs, compact text, and channel colors mapped from Ashita chat modes.
-It starts with one Main window containing four tabs:
+This version renders draggable, resizable ImGui replacement chat windows with
+configurable chrome and background opacity. It can stay close to the native FFXI
+chat log with a translucent panel, tabs, search, and footer controls, or render
+as floating chat text with no visible bars or panel. It starts with one Main
+window containing four tabs:
 
 - General: all captured chat lines.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
 
-Each window includes its own tab selection, search field, and scroll state over
-the same bounded local chat buffer. It is passive UI: it only captures
+Each window includes its own tab selection, search field, footer controls, and
+scroll state over the same bounded local chat buffer when those controls are
+enabled. It is passive UI: it only captures
 non-injected incoming chat text and renders it locally. Say, shout, yell, tell,
 party, linkshell, assist, emote, system, and combat-style lines are colored from
 the closest known native chat mode colors. Injected addon/status output is left
@@ -47,6 +49,12 @@ return {
             window_y = 528,
             window_width = 840,
             window_height = 310,
+            show_tabs = false,
+            show_search = false,
+            show_footer = false,
+            show_border = false,
+            show_scrollbar = false,
+            background_opacity = 0.00,
             tabs = {
                 { key = 'general', label = 'General', filters = { 'all' } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
@@ -65,6 +73,14 @@ common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
 field for exact/custom IDs. `contains` matches case-insensitive text fragments.
 Legacy configs with top-level `tabs = { ... }` still load as a single Main
 window.
+
+Each window can also set `show_tabs`, `show_search`, `show_footer`,
+`show_border`, `show_scrollbar`, and `background_opacity`. Use
+`show_tabs = false`, `show_search = false`, `show_footer = false`,
+`show_border = false`, `show_scrollbar = false`, and
+`background_opacity = 0.00` for floating text with no visible chat chrome.
+The loader also accepts negative aliases such as `hide_tabs = true` and
+`hide_search = true` for hand-written configs.
 
 Each window also stores `window_x`, `window_y`, `window_width`, and
 `window_height`. Move or resize the chat window, then click `Save` in

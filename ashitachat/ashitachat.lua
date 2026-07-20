@@ -29,6 +29,7 @@ local IMGUI = {
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
     window_always_auto_resize = imgui_const('ImGuiWindowFlags_AlwaysAutoResize'),
+    window_no_scrollbar = imgui_const('ImGuiWindowFlags_NoScrollbar'),
 };
 
 local COLORS = {
@@ -78,10 +79,18 @@ local DEFAULT_WINDOW_X = 18;
 local DEFAULT_WINDOW_Y = 528;
 local DEFAULT_WINDOW_WIDTH = 840;
 local DEFAULT_WINDOW_HEIGHT = 310;
+local DEFAULT_SHOW_TABS = true;
+local DEFAULT_SHOW_SEARCH = true;
+local DEFAULT_SHOW_FOOTER = true;
+local DEFAULT_SHOW_BORDER = true;
+local DEFAULT_SHOW_SCROLLBAR = true;
+local DEFAULT_BACKGROUND_OPACITY = 0.74;
 local WINDOW_POSITION_MIN = -2000;
 local WINDOW_POSITION_MAX = 10000;
 local WINDOW_SIZE_MIN = 120;
 local WINDOW_SIZE_MAX = 4000;
+local BACKGROUND_OPACITY_MIN = 0.00;
+local BACKGROUND_OPACITY_MAX = 1.00;
 
 local VALID_FILTERS = {
     all = true,
@@ -319,6 +328,64 @@ local function normalize_int(value, fallback, minimum, maximum)
     return number;
 end
 
+local function normalize_float(value, fallback, minimum, maximum)
+    local number = tonumber(value);
+    if (number == nil) then
+        number = fallback;
+    end
+
+    if (minimum ~= nil and number < minimum) then
+        number = minimum;
+    elseif (maximum ~= nil and number > maximum) then
+        number = maximum;
+    end
+
+    return number;
+end
+
+local function normalize_bool(value, fallback)
+    if (value == nil) then
+        return fallback;
+    end
+
+    if (type(value) == 'boolean') then
+        return value;
+    end
+
+    local text = trim_string(value):lower();
+    if (text == 'true' or text == 'yes' or text == 'on' or text == '1') then
+        return true;
+    elseif (text == 'false' or text == 'no' or text == 'off' or text == '0') then
+        return false;
+    end
+
+    return fallback;
+end
+
+local function first_config_value(source, keys)
+    for _, key in ipairs(keys or {}) do
+        if (source[key] ~= nil) then
+            return source[key];
+        end
+    end
+
+    return nil;
+end
+
+local function normalize_visibility_option(source, positive_keys, negative_keys, fallback)
+    local value = first_config_value(source, positive_keys);
+    if (value ~= nil) then
+        return normalize_bool(value, fallback);
+    end
+
+    value = first_config_value(source, negative_keys);
+    if (value ~= nil) then
+        return not normalize_bool(value, not fallback);
+    end
+
+    return fallback;
+end
+
 local function normalize_tab(raw, index, used_keys)
     local tab = type(raw) == 'table' and raw or {};
     local label = trim_string(tab.label or tab.name);
@@ -394,6 +461,12 @@ local function normalize_window(raw, index, used_keys)
         window_y = normalize_int(source.window_y or source.y, DEFAULT_WINDOW_Y - offset, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX),
         window_width = normalize_int(source.window_width or source.width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
         window_height = normalize_int(source.window_height or source.height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
+        show_tabs = normalize_visibility_option(source, { 'show_tabs', 'tabs_visible' }, { 'hide_tabs', 'tabs_hidden' }, DEFAULT_SHOW_TABS),
+        show_search = normalize_visibility_option(source, { 'show_search', 'search_visible' }, { 'hide_search', 'search_hidden' }, DEFAULT_SHOW_SEARCH),
+        show_footer = normalize_visibility_option(source, { 'show_footer', 'footer_visible' }, { 'hide_footer', 'footer_hidden' }, DEFAULT_SHOW_FOOTER),
+        show_border = normalize_visibility_option(source, { 'show_border', 'border_visible' }, { 'hide_border', 'border_hidden' }, DEFAULT_SHOW_BORDER),
+        show_scrollbar = normalize_visibility_option(source, { 'show_scrollbar', 'show_scrollbars', 'scrollbar_visible', 'scrollbars_visible' }, { 'hide_scrollbar', 'hide_scrollbars', 'scrollbar_hidden', 'scrollbars_hidden' }, DEFAULT_SHOW_SCROLLBAR),
+        background_opacity = normalize_float(source.background_opacity or source.bg_opacity or source.opacity, DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX),
         tabs = normalize_tabs(source.tabs),
         tab_by_key = {},
         selected_tab = normalize_key(source.selected_tab or source.selected or '', ''),
@@ -736,6 +809,8 @@ local function editor_from_window(window, index)
         visible = false;
     end
 
+    local background_opacity = normalize_float(window.background_opacity, DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX);
+
     local tabs = {};
     for tab_index, tab in ipairs(window.tabs or DEFAULT_TABS) do
         table.insert(tabs, editor_from_tab(tab, tab_index));
@@ -749,6 +824,13 @@ local function editor_from_window(window, index)
         window_y = window.window_y,
         window_width = window.window_width,
         window_height = window.window_height,
+        show_tabs = window.show_tabs ~= false,
+        show_search = window.show_search ~= false,
+        show_footer = window.show_footer ~= false,
+        show_border = window.show_border ~= false,
+        show_scrollbar = window.show_scrollbar ~= false,
+        background_opacity = background_opacity,
+        background_opacity_buffer = T{ ('%.2f'):fmt(background_opacity) },
         tabs = tabs,
     };
 end
@@ -797,6 +879,12 @@ local function config_editor_window(row, index)
         window_y = row.window_y,
         window_width = row.window_width,
         window_height = row.window_height,
+        show_tabs = row.show_tabs ~= false,
+        show_search = row.show_search ~= false,
+        show_footer = row.show_footer ~= false,
+        show_border = row.show_border ~= false,
+        show_scrollbar = row.show_scrollbar ~= false,
+        background_opacity = normalize_float(row.background_opacity_buffer and row.background_opacity_buffer[1] or row.background_opacity, row.background_opacity or DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX),
         tabs = config_editor_tabs(row),
     };
 end
@@ -861,6 +949,12 @@ local function config_text_from_windows(windows)
         table.insert(lines, ('            window_y = %d,'):fmt(normalize_int(window.window_y, DEFAULT_WINDOW_Y, WINDOW_POSITION_MIN, WINDOW_POSITION_MAX)));
         table.insert(lines, ('            window_width = %d,'):fmt(normalize_int(window.window_width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
         table.insert(lines, ('            window_height = %d,'):fmt(normalize_int(window.window_height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
+        table.insert(lines, ('            show_tabs = %s,'):fmt(window.show_tabs == true and 'true' or 'false'));
+        table.insert(lines, ('            show_search = %s,'):fmt(window.show_search == true and 'true' or 'false'));
+        table.insert(lines, ('            show_footer = %s,'):fmt(window.show_footer == true and 'true' or 'false'));
+        table.insert(lines, ('            show_border = %s,'):fmt(window.show_border == true and 'true' or 'false'));
+        table.insert(lines, ('            show_scrollbar = %s,'):fmt(window.show_scrollbar == true and 'true' or 'false'));
+        table.insert(lines, ('            background_opacity = %.2f,'):fmt(normalize_float(window.background_opacity, DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX)));
         table.insert(lines, '            tabs = {');
         for _, tab in ipairs(window.tabs or {}) do
             table.insert(lines, ('                { %s },'):fmt(table.concat(tab_config_fields(tab), ', ')));
@@ -1206,6 +1300,10 @@ local function message_color(mode, category)
 end
 
 local function normalized_search(window)
+    if (window.show_search ~= true) then
+        return '';
+    end
+
     return trim_string(window.search_buffer[1]):lower();
 end
 
@@ -1353,6 +1451,15 @@ local function pop_tab_style()
     imgui.PopStyleColor(4);
 end
 
+local function color_with_alpha(color, alpha)
+    return {
+        color[1] or 0.0,
+        color[2] or 0.0,
+        color[3] or 0.0,
+        normalize_float(alpha, color[4] or 1.0, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX),
+    };
+end
+
 local function window_id(window)
     return window.key or tostring(window.index or 'window');
 end
@@ -1419,9 +1526,9 @@ local function render_tabs(window)
     end
 end
 
-local function render_search(window)
+local function render_search(window, inline)
     local width = type(imgui.GetWindowWidth) == 'function' and imgui.GetWindowWidth() or 760;
-    if (width >= 650) then
+    if (inline == true and width >= 650) then
         imgui.SameLine(0, 14);
     end
 
@@ -1439,11 +1546,20 @@ local function render_search(window)
     end
 end
 
-local function begin_child(id, size, border)
+local function begin_child(id, size, border, flags)
     local child_open = false;
     local child_visible = true;
 
     if (type(imgui.BeginChild) == 'function' and type(imgui.EndChild) == 'function') then
+        if (flags ~= nil and flags ~= 0) then
+            local ok, result = pcall(imgui.BeginChild, id, size, border, flags);
+            if (ok) then
+                child_open = true;
+                child_visible = result ~= false;
+                return child_open, child_visible;
+            end
+        end
+
         local ok, result = pcall(imgui.BeginChild, id, size, border);
         child_open = ok;
         child_visible = (not ok) or result ~= false;
@@ -1475,7 +1591,9 @@ end
 local function render_message_list(window)
     local query = normalized_search(window);
     local selected_tab = window.tab_by_key[window.selected_tab] or window.tabs[1];
-    local child_open, child_visible = begin_child(('##ashitachat_%s_message_list'):fmt(window_id(window)), { 0, -24 }, false);
+    local child_height = window.show_footer == true and -24 or 0;
+    local child_flags = window.show_scrollbar == true and 0 or IMGUI.window_no_scrollbar;
+    local child_open, child_visible = begin_child(('##ashitachat_%s_message_list'):fmt(window_id(window)), { 0, child_height }, false, child_flags);
     local visible_count = 0;
 
     if (child_visible) then
@@ -1530,14 +1648,19 @@ local function render_chat_window(window)
     end
 
     local window_flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
+    if (window.show_scrollbar ~= true) then
+        window_flags = bit.bor(window_flags, IMGUI.window_no_scrollbar);
+    end
+
+    local show_border = window.show_border == true;
     imgui.SetNextWindowPos({ window.window_x, window.window_y }, IMGUI.cond_first_use);
     imgui.SetNextWindowSize({ window.window_width, window.window_height }, IMGUI.cond_first_use);
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
-    imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
+    imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
-    imgui.PushStyleColor(IMGUI.col_window_bg, COLORS.panel_bg);
+    imgui.PushStyleColor(IMGUI.col_window_bg, color_with_alpha(COLORS.panel_bg, window.background_opacity));
     imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
-    imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
+    imgui.PushStyleColor(IMGUI.col_border, show_border and COLORS.border or color_with_alpha(COLORS.border, 0.0));
     imgui.PushStyleColor(IMGUI.col_frame_bg, COLORS.frame);
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
@@ -1548,11 +1671,23 @@ local function render_chat_window(window)
             imgui.SetWindowFontScale(state.font_scale);
         end
 
-        render_tabs(window);
-        render_search(window);
-        imgui.Separator();
+        local controls_visible = false;
+        if (window.show_tabs == true) then
+            render_tabs(window);
+            controls_visible = true;
+        end
+        if (window.show_search == true) then
+            render_search(window, controls_visible);
+            controls_visible = true;
+        end
+        if (controls_visible) then
+            imgui.Separator();
+        end
+
         local visible_count = render_message_list(window);
-        render_footer(window, visible_count);
+        if (window.show_footer == true) then
+            render_footer(window, visible_count);
+        end
     end
 
     imgui.End();
@@ -1782,6 +1917,11 @@ local function render_config_window_selector()
 end
 
 local function render_config_window_editor(index, row)
+    if (row.background_opacity_buffer == nil) then
+        row.background_opacity = normalize_float(row.background_opacity, DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX);
+        row.background_opacity_buffer = T{ ('%.2f'):fmt(row.background_opacity) };
+    end
+
     imgui.TextColored(COLORS.tab_text, ('Window %d'):fmt(index));
     imgui.SameLine(0, 8);
     if (imgui.Button(('Up##ashitachat_config_window_%d_up'):fmt(index), { 42, 0 })) then
@@ -1814,6 +1954,44 @@ local function render_config_window_editor(index, row)
     imgui.SameLine(0, 12);
     imgui.PushItemWidth(220);
     if (imgui.InputText(('Label##ashitachat_config_window_%d_label'):fmt(index), row.label_buffer, 48)) then
+        mark_config_dirty();
+    end
+    imgui.PopItemWidth();
+
+    imgui.TextColored(COLORS.status, 'Chrome');
+    local show_tabs = row.show_tabs ~= false;
+    if (imgui.Checkbox(('Tabs##ashitachat_config_window_%d_show_tabs'):fmt(index), { show_tabs })) then
+        row.show_tabs = not show_tabs;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 8);
+    local show_search = row.show_search ~= false;
+    if (imgui.Checkbox(('Search##ashitachat_config_window_%d_show_search'):fmt(index), { show_search })) then
+        row.show_search = not show_search;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 8);
+    local show_footer = row.show_footer ~= false;
+    if (imgui.Checkbox(('Footer##ashitachat_config_window_%d_show_footer'):fmt(index), { show_footer })) then
+        row.show_footer = not show_footer;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 8);
+    local show_border = row.show_border ~= false;
+    if (imgui.Checkbox(('Border##ashitachat_config_window_%d_show_border'):fmt(index), { show_border })) then
+        row.show_border = not show_border;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 8);
+    local show_scrollbar = row.show_scrollbar ~= false;
+    if (imgui.Checkbox(('Scrollbar##ashitachat_config_window_%d_show_scrollbar'):fmt(index), { show_scrollbar })) then
+        row.show_scrollbar = not show_scrollbar;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 12);
+    imgui.PushItemWidth(64);
+    if (imgui.InputText(('Opacity##ashitachat_config_window_%d_background_opacity'):fmt(index), row.background_opacity_buffer, 8)) then
+        row.background_opacity = normalize_float(row.background_opacity_buffer[1], row.background_opacity or DEFAULT_BACKGROUND_OPACITY, BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX);
         mark_config_dirty();
     end
     imgui.PopItemWidth();
