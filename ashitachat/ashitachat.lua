@@ -2248,7 +2248,7 @@ end
 
 ashita.events.register('load', 'load_cb', function ()
     load_config();
-    log_info('Loaded. Replacement chat window is visible; native chat is visible until /ashitachat hide is used.');
+    set_hidden(true);
     if (state.config_error ~= nil) then
         log_warn('Using default tab config because ashitachat_config.lua did not load: ' .. state.config_error);
     end

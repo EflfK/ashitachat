@@ -61,6 +61,7 @@ $required = @(
     "if (is_injected(e)) then",
     "render_chat_windows()",
     "toggle_native",
+    "load_config();`n    set_hidden(true);",
     "set_hidden(not state.hide_native)",
     "ashita.events.register('command'",
     "ashita.events.register('d3d_present'",
