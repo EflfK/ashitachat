@@ -1343,6 +1343,24 @@ local function message_matches_tab(message, tab)
     return false;
 end
 
+local function message_matches_window(message, window)
+    if (window == nil) then
+        return false;
+    end
+
+    local selected_tab = window.tab_by_key[window.selected_tab] or window.tabs[1];
+    return message_matches_tab(message, selected_tab)
+        and message_matches_search(message, normalized_search(window));
+end
+
+local function mark_matching_windows_scroll_to_bottom(message)
+    for _, window in ipairs(state.windows) do
+        if (message_matches_window(message, window)) then
+            window.scroll_to_bottom = true;
+        end
+    end
+end
+
 local function append_message(e)
     if (is_injected(e)) then
         return false;
@@ -1363,7 +1381,7 @@ local function append_message(e)
     local display = display_text(display_mode, text);
 
     state.message_seq = state.message_seq + 1;
-    table.insert(state.messages, {
+    local message = {
         id = state.message_seq,
         time = os.date('%H:%M:%S'),
         mode = mode,
@@ -1373,13 +1391,14 @@ local function append_message(e)
         display = display,
         search_text = (display .. ' ' .. text):lower(),
         color = message_color(display_mode, category),
-    });
+    };
+    table.insert(state.messages, message);
 
     while (#state.messages > state.max_messages) do
         table.remove(state.messages, 1);
     end
 
-    mark_windows_scroll_to_bottom();
+    mark_matching_windows_scroll_to_bottom(message);
     return true;
 end
 

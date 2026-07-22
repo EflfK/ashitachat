@@ -36,6 +36,8 @@ $required = @(
     "config_windows = {}",
     "messages = {}",
     "append_message(e)",
+    "message_matches_window(message, window)",
+    "mark_matching_windows_scroll_to_bottom(message)",
     "message_color(display_mode, category)",
     "render_config_window()",
     "render_config_mode_checkbox(row, window_index, tab_index, mode_filter)",
