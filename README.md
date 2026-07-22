@@ -98,13 +98,18 @@ blocks non-injected incoming text by setting `e.blocked = true`, except for
 native NPC dialog modes 150-152. Those modes must continue through FFXI's
 native event UI so choice menus such as Home Point destinations and Unity
 selection remain interactive. Injected lines are left visible so addon status
-messages can still be seen.
+messages can still be seen. FFXI's mode-190 legacy render copies of NPC dialog
+are blocked, preventing the native chat box from filling with duplicate
+cutscene text without interfering with the event itself.
 
 It intentionally does not write to the legacy chat-window memory structures.
 Pinning those structures closed also suppresses unrelated interactive menus and
 breaks the normal `F` chat expansion behavior. Native lines are hidden only by
 blocking their local `text_in` rendering after they have been captured for the
-replacement windows; NPC event dialog remains native-visible for compatibility.
+replacement windows; original NPC event dialog remains available to FFXI's
+native event processing for compatibility. The mode-190 legacy copy is
+suppressed, so this compatibility path does not populate the large native chat
+log.
 
 ## Install
 

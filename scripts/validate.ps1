@@ -72,6 +72,8 @@ $required = @(
     "Mode IDs##ashitachat_config_window_%d_tab_%d_modes",
     "e.injected == true",
     "if (mode == 190 or display_mode == 190) then",
+    "if (mode == 190) then",
+    "state.mode_counts[mode] = (state.mode_counts[mode] or 0) + 1",
     "is_ashitachat_message(e.message)",
     "not is_injected(e)",
     "NATIVE_DIALOG_MODES[mode] == true",

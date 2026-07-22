@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.2';
+addon.version = '0.1.3';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -2325,6 +2325,15 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
 
     local mode = chat_mode(e);
     if (mode == 190) then
+        -- FFXI reinjects native NPC/event dialog as mode 190 for its legacy
+        -- chat window after the original 150-152 event has already driven
+        -- the interactive cutscene state. Suppress only this rendered copy;
+        -- blocking the original event prevents choice menus from appearing.
+        if (state.hide_native == true) then
+            state.blocked_count = state.blocked_count + 1;
+            state.mode_counts[mode] = (state.mode_counts[mode] or 0) + 1;
+            e.blocked = true;
+        end
         return;
     end
 
