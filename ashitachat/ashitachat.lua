@@ -103,6 +103,7 @@ local VALID_FILTERS = {
 local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg' };
 
 local MODE_FILTERS = {
+    { key = 'npc', label = 'NPC', modes = { 150, 151, 152 } },
     { key = 'say', label = 'Say', modes = { 1, 9 } },
     { key = 'shout', label = 'Shout', modes = { 2, 3, 10 } },
     { key = 'yell', label = 'Yell', modes = { 11 } },
@@ -1368,7 +1369,11 @@ local function append_message(e)
 
     local mode = chat_mode(e);
     local display_mode = chat_display_mode(e);
-    if (mode == 150 or mode == 151 or mode == 152 or display_mode == 150 or display_mode == 151 or display_mode == 152) then
+    -- NPC dialog is emitted once in its original 150-152 modes, then
+    -- reinjected for the legacy chat windows in mode 190. Capture the
+    -- original event and ignore the reinjections so replacement windows do
+    -- not show the same NPC line twice.
+    if (mode == 190 or display_mode == 190) then
         return false;
     end
 
@@ -2384,7 +2389,7 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
     end
 
     local mode = chat_mode(e);
-    if (mode == 150 or mode == 151 or mode == 152) then
+    if (mode == 190) then
         return;
     end
 

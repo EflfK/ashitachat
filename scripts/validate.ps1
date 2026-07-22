@@ -28,6 +28,7 @@ $required = @(
     "window_by_key",
     "local MODE_COLORS =",
     "local MODE_FILTERS =",
+    "{ key = 'npc', label = 'NPC', modes = { 150, 151, 152 } }",
     "message_matches_tab(message, tab)",
     "chat_display_mode(e)",
     "selected_tab = normalize_key",
@@ -71,6 +72,7 @@ $required = @(
     "/ashitachat config",
     "Mode IDs##ashitachat_config_window_%d_tab_%d_modes",
     "e.injected == true",
+    "if (mode == 190 or display_mode == 190) then",
     "is_ashitachat_message(e.message)",
     "not is_injected(e)",
     "e.blocked = true"

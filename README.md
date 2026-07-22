@@ -71,8 +71,10 @@ and/or `contains`. Valid filters are `all`, `general`, `combat`, `group`, and
 `lfg`. `modes` matches exact Ashita chat modes; the in-game config exposes
 common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
 field for exact/custom IDs. `contains` matches case-insensitive text fragments.
-Legacy configs with top-level `tabs = { ... }` still load as a single Main
-window.
+The common mode checkboxes include `NPC`, which matches native NPC dialog modes
+150-152. Ashita's mode-190 legacy-chat reinjections are intentionally ignored
+so NPC dialog appears once. Legacy configs with top-level `tabs = { ... }`
+still load as a single Main window.
 
 Each window can also set `show_tabs`, `show_search`, `show_footer`,
 `show_border`, `show_scrollbar`, and `background_opacity`. Use
