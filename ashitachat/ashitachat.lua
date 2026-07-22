@@ -89,6 +89,7 @@ local WINDOW_POSITION_MIN = -2000;
 local WINDOW_POSITION_MAX = 10000;
 local WINDOW_SIZE_MIN = 120;
 local WINDOW_SIZE_MAX = 4000;
+local SCROLL_BOTTOM_TOLERANCE = 1.0;
 local BACKGROUND_OPACITY_MIN = 0.00;
 local BACKGROUND_OPACITY_MAX = 1.00;
 local HISTORY_VERSION = 2;
@@ -479,6 +480,7 @@ local function normalize_window(raw, index, used_keys)
         selected_tab = normalize_key(source.selected_tab or source.selected or '', ''),
         search_buffer = T{ '' },
         scroll_to_bottom = true,
+        is_at_bottom = true,
     };
 end
 
@@ -1460,7 +1462,7 @@ end
 
 local function mark_matching_windows_scroll_to_bottom(message)
     for _, window in ipairs(state.windows) do
-        if (message_matches_window(message, window)) then
+        if (window.is_at_bottom ~= false and message_matches_window(message, window)) then
             window.scroll_to_bottom = true;
         end
     end
@@ -1659,6 +1661,20 @@ local function render_message(message)
     text_colored_wrapped(message.color, message.display);
 end
 
+local function scroll_is_at_bottom()
+    if (type(imgui.GetScrollY) ~= 'function' or type(imgui.GetScrollMaxY) ~= 'function') then
+        return nil;
+    end
+
+    local scroll_y_ok, scroll_y = pcall(imgui.GetScrollY);
+    local scroll_max_y_ok, scroll_max_y = pcall(imgui.GetScrollMaxY);
+    if (not scroll_y_ok or not scroll_max_y_ok or type(scroll_y) ~= 'number' or type(scroll_max_y) ~= 'number') then
+        return nil;
+    end
+
+    return scroll_max_y - scroll_y <= SCROLL_BOTTOM_TOLERANCE;
+end
+
 local function render_message_list(window)
     local query = normalized_search(window);
     local selected_tab = window.tab_by_key[window.selected_tab] or window.tabs[1];
@@ -1686,6 +1702,11 @@ local function render_message_list(window)
 
         if (window.scroll_to_bottom and type(imgui.SetScrollHereY) == 'function') then
             imgui.SetScrollHereY(1.0);
+        end
+
+        local is_at_bottom = scroll_is_at_bottom();
+        if (is_at_bottom ~= nil) then
+            window.is_at_bottom = window.scroll_to_bottom or is_at_bottom;
         end
     end
 

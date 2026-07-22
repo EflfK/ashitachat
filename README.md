@@ -24,7 +24,9 @@ window containing four tabs:
 
 Each window includes its own tab selection, search field, footer controls, and
 scroll state over the same bounded local chat buffer when those controls are
-enabled. It is passive UI: it only captures
+enabled. New messages follow the bottom only while that window is already at
+the bottom, so scrolling up leaves the current reading position undisturbed.
+It is passive UI: it only captures
 non-injected incoming chat text and renders it locally. Say, shout, yell, tell,
 party, linkshell, assist, emote, system, and combat-style lines are colored from
 the closest known native chat mode colors. Injected addon/status output is left

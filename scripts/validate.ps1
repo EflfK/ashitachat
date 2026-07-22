@@ -12,7 +12,7 @@ foreach ($path in @($addon, $config, $readme, $install)) {
     }
 }
 
-$lua = Get-Content -LiteralPath $addon -Raw
+$lua = (Get-Content -LiteralPath $addon -Raw) -replace "`r`n", "`n"
 $configLua = Get-Content -LiteralPath $config -Raw
 $installContent = Get-Content -LiteralPath $install -Raw
 
@@ -45,6 +45,10 @@ $required = @(
     "append_message(e)",
     "message_matches_window(message, window)",
     "mark_matching_windows_scroll_to_bottom(message)",
+    "window.is_at_bottom ~= false",
+    "local function scroll_is_at_bottom()",
+    "imgui.GetScrollY",
+    "imgui.GetScrollMaxY",
     "message_color(display_mode, category)",
     "ParseAutoTranslate(text, true)",
     "text:strip_colors():strip_translate(true)",
