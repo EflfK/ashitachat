@@ -91,6 +91,7 @@ local WINDOW_SIZE_MIN = 120;
 local WINDOW_SIZE_MAX = 4000;
 local BACKGROUND_OPACITY_MIN = 0.00;
 local BACKGROUND_OPACITY_MAX = 1.00;
+local HISTORY_VERSION = 2;
 local HISTORY_MESSAGE_LIMIT = 100;
 
 local VALID_FILTERS = {
@@ -1254,7 +1255,11 @@ local function chat_display_mode(e)
 end
 
 local function clean_message(message)
-    local text = tostring(message or ''):gsub('\r', ' '):gsub('\n', ' '):gsub('%z', '');
+    local text = tostring(message or '');
+
+    text = AshitaCore:GetChatManager():ParseAutoTranslate(text, true);
+    text = text:strip_colors():strip_translate(true);
+    text = text:gsub('\r', ' '):gsub('\n', ' '):gsub('%z', '');
 
     text = text:gsub('.', function (character)
         local value = character:byte();
@@ -1317,7 +1322,7 @@ end
 local function history_text()
     local lines = {
         'return {',
-        '    version = 1,',
+        ('    version = %d,'):fmt(HISTORY_VERSION),
         '    messages = {',
     };
     local first = math.max(1, #state.messages - HISTORY_MESSAGE_LIMIT + 1);
@@ -1361,6 +1366,12 @@ local function load_history()
     local ok, history, error_message = load_lua_config_file(path);
     if (not ok or type(history) ~= 'table' or type(history.messages) ~= 'table') then
         return 0, tostring(error_message or 'History file is invalid.');
+    end
+
+    -- Version 1 history contains orphaned bytes left behind by the old
+    -- single-byte control-character cleanup and cannot be repaired reliably.
+    if (tonumber(history.version) or 0) < HISTORY_VERSION then
+        return 0, nil;
     end
 
     state.messages = {};
