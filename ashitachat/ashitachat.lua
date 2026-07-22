@@ -212,6 +212,8 @@ local state = {
     mode_counts = {},
 };
 
+local set_hidden;
+
 local commands = {
     ['/ashitachat'] = true,
     ['/achat'] = true,
@@ -1640,6 +1642,11 @@ local function render_footer(window, visible_count)
         state.config_visible[1] = true;
         state.config_selected_window = window.index or 1;
     end
+    imgui.SameLine(0, 6);
+    local native_action = state.hide_native and 'show orig' or 'hide orig';
+    if (imgui.Button(('%s##ashitachat_%s_toggle_native'):fmt(native_action, id), { 66, 0 })) then
+        set_hidden(not state.hide_native);
+    end
 end
 
 local function render_chat_window(window)
@@ -2144,7 +2151,7 @@ local function selected_tabs_summary()
     return table.concat(parts, ', ');
 end
 
-local function set_hidden(hidden)
+set_hidden = function(hidden)
     state.hide_native = hidden == true;
 
     if (state.hide_native) then
