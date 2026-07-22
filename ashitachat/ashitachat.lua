@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.1';
+addon.version = '0.1.2';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -115,6 +115,12 @@ local MODE_FILTERS = {
     { key = 'system', label = 'System', modes = { 29, 121 } },
     { key = 'unity', label = 'Unity', modes = { 212 } },
     { key = 'assist', label = 'Assist', modes = { 220, 222 } },
+};
+
+local NATIVE_DIALOG_MODES = {
+    [150] = true,
+    [151] = true,
+    [152] = true,
 };
 
 local MODE_LABELS = {
@@ -2324,7 +2330,11 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
 
     append_message(e);
 
-    if (state.hide_native ~= true) then
+    -- Native NPC dialog participates in the game's event UI flow. Blocking
+    -- these modes can prevent choice menus (Home Points, Unity selection,
+    -- and similar prompts) from becoming interactive, so always pass them
+    -- through after capturing them for the replacement window.
+    if (state.hide_native ~= true or NATIVE_DIALOG_MODES[mode] == true) then
         return;
     end
 

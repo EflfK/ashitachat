@@ -28,6 +28,7 @@ $required = @(
     "window_by_key",
     "local MODE_COLORS =",
     "local MODE_FILTERS =",
+    "local NATIVE_DIALOG_MODES =",
     "{ key = 'npc', label = 'NPC', modes = { 150, 151, 152 } }",
     "message_matches_tab(message, tab)",
     "chat_display_mode(e)",
@@ -73,6 +74,7 @@ $required = @(
     "if (mode == 190 or display_mode == 190) then",
     "is_ashitachat_message(e.message)",
     "not is_injected(e)",
+    "NATIVE_DIALOG_MODES[mode] == true",
     "e.blocked = true"
 )
 
