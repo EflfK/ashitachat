@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.3';
+addon.version = '0.1.4';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -91,6 +91,7 @@ local WINDOW_SIZE_MIN = 120;
 local WINDOW_SIZE_MAX = 4000;
 local BACKGROUND_OPACITY_MIN = 0.00;
 local BACKGROUND_OPACITY_MAX = 1.00;
+local HISTORY_MESSAGE_LIMIT = 100;
 
 local VALID_FILTERS = {
     all = true,
@@ -564,6 +565,15 @@ local function config_file_path()
     end
 
     return legacy_config_file_path();
+end
+
+local function history_file_path()
+    local dir = config_dir_path();
+    if (dir == nil) then
+        return nil;
+    end
+
+    return path_join(dir, 'ashitachat_history.lua');
 end
 
 local function file_exists(path)
@@ -1302,6 +1312,87 @@ end
 
 local function message_color(mode, category)
     return MODE_COLORS[mode] or COLORS[category] or COLORS.general;
+end
+
+local function history_text()
+    local lines = {
+        'return {',
+        '    version = 1,',
+        '    messages = {',
+    };
+    local first = math.max(1, #state.messages - HISTORY_MESSAGE_LIMIT + 1);
+
+    for index = first, #state.messages do
+        local message = state.messages[index];
+        table.insert(lines, ('        { time = %s, mode = %d, display_mode = %d, text = %s, display = %s },'):fmt(
+            config_string(message.time),
+            bit.band(tonumber(message.mode) or 0, 0x000000FF),
+            bit.band(tonumber(message.display_mode) or 0, 0x000000FF),
+            config_string(message.text),
+            config_string(message.display)));
+    end
+
+    table.insert(lines, '    },');
+    table.insert(lines, '};');
+    table.insert(lines, '');
+    return table.concat(lines, '\n');
+end
+
+local function save_history()
+    local path = history_file_path();
+    if (path == nil) then
+        return false, 'Ashita config path is unavailable.';
+    end
+
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (not dir_ok) then
+        return false, tostring(dir_or_error);
+    end
+
+    return write_text_file(path_join(dir_or_error, 'ashitachat_history.lua'), history_text());
+end
+
+local function load_history()
+    local path = history_file_path();
+    if (path == nil or not file_exists(path)) then
+        return 0, nil;
+    end
+
+    local ok, history, error_message = load_lua_config_file(path);
+    if (not ok or type(history) ~= 'table' or type(history.messages) ~= 'table') then
+        return 0, tostring(error_message or 'History file is invalid.');
+    end
+
+    state.messages = {};
+    state.message_seq = 0;
+    local first = math.max(1, #history.messages - HISTORY_MESSAGE_LIMIT + 1);
+    for index = first, #history.messages do
+        local saved = history.messages[index];
+        if (type(saved) == 'table' and type(saved.text) == 'string') then
+            local mode = bit.band(tonumber(saved.mode) or 0, 0x000000FF);
+            local display_mode = bit.band(tonumber(saved.display_mode) or mode, 0x000000FF);
+            local text = clean_message(saved.text);
+            local display = clean_message(saved.display or text);
+            if (text ~= '') then
+                local category = classify_message(display_mode, text);
+                state.message_seq = state.message_seq + 1;
+                table.insert(state.messages, {
+                    id = state.message_seq,
+                    time = type(saved.time) == 'string' and saved.time:match('^%d%d:%d%d:%d%d$') and saved.time or os.date('%H:%M:%S'),
+                    mode = mode,
+                    display_mode = display_mode,
+                    category = category,
+                    text = text,
+                    display = display,
+                    search_text = (display .. ' ' .. text):lower(),
+                    color = message_color(display_mode, category),
+                });
+            end
+        end
+    end
+
+    mark_windows_scroll_to_bottom();
+    return #state.messages, nil;
 end
 
 local function normalized_search(window)
@@ -2189,13 +2280,20 @@ end
 
 ashita.events.register('load', 'load_cb', function ()
     load_config();
+    local restored_count, history_error = load_history();
     set_hidden(true);
     if (state.config_error ~= nil) then
         log_warn('Using default tab config because ashitachat_config.lua did not load: ' .. state.config_error);
     end
+    if (history_error ~= nil) then
+        log_warn('Recent chat history did not load: ' .. history_error);
+    elseif (restored_count > 0) then
+        log_info(('Restored %d recent chat lines.'):fmt(restored_count));
+    end
 end);
 
 ashita.events.register('unload', 'unload_cb', function ()
+    save_history();
     state.hide_native = false;
     state.ui_visible[1] = false;
     state.config_visible[1] = false;

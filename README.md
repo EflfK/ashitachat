@@ -89,6 +89,11 @@ Each window also stores `window_x`, `window_y`, `window_width`, and
 `/ashitachat config` to persist its placement in the config folder outside the
 addon install.
 
+AshitaChat also saves the most recent 100 captured lines when the addon unloads
+and restores them on its next load. The bounded history lives at
+`Ashita/config/addons/ashitachat/ashitachat_history.lua`, so addon reloads and
+reinstalls retain a short scrollback without adding per-message disk writes.
+
 The addon can also suppress native chat-log lines while leaving the legacy UI
 windows available for chat input, NPC choices, Home Point destinations, and
 other interactive menus.
