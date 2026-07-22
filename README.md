@@ -89,17 +89,19 @@ Each window also stores `window_x`, `window_y`, `window_width`, and
 `/ashitachat config` to persist its placement in the config folder outside the
 addon install.
 
-The addon can also suppress native chat-log lines and pin the legacy chat
-windows closed while chat input is not open.
+The addon can also suppress native chat-log lines while leaving the legacy UI
+windows available for chat input, NPC choices, Home Point destinations, and
+other interactive menus.
 
 The addon registers the Ashita v4 `text_in` event. When hiding is enabled, it
 blocks non-injected incoming text by setting `e.blocked = true`. Injected lines
 are left visible so addon status messages can still be seen.
 
-It also uses the same legacy-chat window field that FancyChat writes while its
-replacement window is active. This is a local UI-only memory write that keeps
-the legacy chat windows closed; it is skipped while the normal chat input is
-open so the user can still type `/ashitachat show`.
+It intentionally does not write to the legacy chat-window memory structures.
+Pinning those structures closed also suppresses unrelated interactive menus and
+breaks the normal `F` chat expansion behavior. Native lines are hidden only by
+blocking their local `text_in` rendering after they have been captured for the
+replacement windows.
 
 ## Install
 
@@ -126,9 +128,9 @@ Then load in game:
 /addon load ashitachat
 ```
 
-The addon suppresses the native chat log as soon as it loads. Use
-`/ashitachat show` if you want to restore the native chat while keeping the
-replacement addon loaded.
+The addon suppresses native chat lines as soon as it loads while preserving the
+legacy UI window state needed by menus and input. Use `/ashitachat show` if you
+want to restore native chat lines while keeping the replacement addon loaded.
 
 The installer also adds `/addon load ashitachat` followed by `/ashitachat hide`
 to `Ashita\scripts\default.txt` by default. The hide command is retained for

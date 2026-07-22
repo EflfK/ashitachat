@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.0';
+addon.version = '0.1.1';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -206,10 +206,6 @@ local state = {
     font_scale = 1.00,
     scroll_to_bottom = true,
     blocked_count = 0,
-    pin_count = 0,
-    pointer_error = nil,
-    win_ptr1 = nil,
-    win_ptr2 = nil,
     mode_counts = {},
 };
 
@@ -1407,65 +1403,6 @@ local function append_message(e)
     return true;
 end
 
-local function find_legacy_chat_windows()
-    state.pointer_error = nil;
-    state.win_ptr1 = nil;
-    state.win_ptr2 = nil;
-
-    local pattern = ashita.memory.find('FFXiMain.dll', 0, 'A1????????C64059018B0D????????C6415901C20800', 0, 0);
-    if (pattern == nil or pattern == 0) then
-        state.pointer_error = 'legacy chat window pattern not found';
-        return false;
-    end
-
-    state.win_ptr1 = ashita.memory.read_uint32(pattern + 0x01);
-    state.win_ptr2 = ashita.memory.read_uint32(pattern + 0x0B);
-
-    if ((state.win_ptr1 == nil or state.win_ptr1 == 0) and (state.win_ptr2 == nil or state.win_ptr2 == 0)) then
-        state.pointer_error = 'legacy chat window pointers were empty';
-        return false;
-    end
-
-    return true;
-end
-
-local function pin_window_closed(pointer_address)
-    if (pointer_address == nil or pointer_address == 0) then
-        return false;
-    end
-
-    local window = ashita.memory.read_uint32(pointer_address);
-    if (window == nil or window == 0) then
-        return false;
-    end
-
-    ashita.memory.unprotect(window + 0x34, 4);
-    ashita.memory.write_uint32(window + 0x34, 0x00);
-    return true;
-end
-
-local function pin_legacy_chat_closed()
-    if (state.hide_native ~= true) then
-        return;
-    end
-
-    if (AshitaCore:GetChatManager():IsInputOpen() ~= 0x00) then
-        return;
-    end
-
-    if (state.win_ptr1 == nil and state.win_ptr2 == nil and not find_legacy_chat_windows()) then
-        return;
-    end
-
-    local pinned = false;
-    pinned = pin_window_closed(state.win_ptr1) or pinned;
-    pinned = pin_window_closed(state.win_ptr2) or pinned;
-
-    if (pinned) then
-        state.pin_count = state.pin_count + 1;
-    end
-end
-
 local function push_tab_style(active)
     imgui.PushStyleColor(IMGUI.col_button, active and COLORS.tab_active or COLORS.tab);
     imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.tab_hover);
@@ -2181,12 +2118,7 @@ set_hidden = function(hidden)
     if (state.hide_native) then
         state.ui_visible[1] = true;
         ensure_any_window_visible();
-        find_legacy_chat_windows();
-        if (state.pointer_error ~= nil) then
-            log_warn('Native chat lines are blocked, but legacy chat window pinning is unavailable: ' .. state.pointer_error .. '.');
-        else
-            log_warn('Native chat lines are blocked and legacy chat windows are pinned closed. Use /ashitachat show to restore.');
-        end
+        log_info('Native chat lines are blocked. Legacy UI windows remain available for menus and chat input.');
     else
         log_info('Native chat lines are visible.');
     end
@@ -2231,12 +2163,12 @@ local function print_help()
     log_info('/ashitachat tabs [window] - List configured replacement chat tabs.');
     log_info('/ashitachat windows - List configured replacement chat windows.');
     log_info('/ashitachat reload - Reload ashitachat_config.lua.');
-    log_info('/ashitachat status - Show trial status, pin count, and blocked-line count.');
+    log_info('/ashitachat status - Show trial status and blocked-line count.');
 end
 
 local function print_status()
     log_info(string.format(
-        'Status: nativeChat=%s, overlay=%s, windows=%d/%d visible, tabs=%d, selected=%s, config=%s, bufferedLines=%d, blockedLines=%d, pins=%d, pointers=%s, modes=%s.',
+        'Status: nativeChat=%s, overlay=%s, windows=%d/%d visible, tabs=%d, selected=%s, config=%s, bufferedLines=%d, blockedLines=%d, modes=%s.',
         state.hide_native and 'hidden' or 'visible',
         state.ui_visible[1] and 'visible' or 'hidden',
         visible_window_count(),
@@ -2246,8 +2178,6 @@ local function print_status()
         state.config_error == nil and 'ready' or 'defaulted',
         #state.messages,
         state.blocked_count,
-        state.pin_count,
-        state.pointer_error or 'ready',
         mode_summary()));
 end
 
@@ -2269,7 +2199,6 @@ ashita.events.register('unload', 'unload_cb', function ()
 end);
 
 ashita.events.register('d3d_present', 'present_cb', function ()
-    pin_legacy_chat_closed();
     render_chat_windows();
     render_config_window();
 end);
