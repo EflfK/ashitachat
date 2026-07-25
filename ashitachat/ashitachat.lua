@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.4';
+addon.version = '0.1.5';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1254,10 +1254,15 @@ local function chat_display_mode(e)
     return bit.band(tonumber(e.mode_modified or e.mode) or 0, 0x000000FF);
 end
 
-local function clean_message(message)
+local function clean_message(message, mode)
     local text = tostring(message or '');
 
-    text = AshitaCore:GetChatManager():ParseAutoTranslate(text, true);
+    -- Native event-dialog text can contain encoded decision-menu payloads.
+    -- Passing those live strings through ParseAutoTranslate before FFXI has
+    -- consumed the event can corrupt choice glyphs in the native menu.
+    if (NATIVE_DIALOG_MODES[mode] ~= true) then
+        text = AshitaCore:GetChatManager():ParseAutoTranslate(text, true);
+    end
     text = text:strip_colors():strip_translate(true);
     text = text:gsub('\r', ' '):gsub('\n', ' '):gsub('%z', '');
 
@@ -1481,7 +1486,7 @@ local function append_message(e)
         return false;
     end
 
-    local text = clean_message(e.message);
+    local text = clean_message(e.message, mode);
     if (text == '') then
         return false;
     end

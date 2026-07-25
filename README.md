@@ -102,10 +102,12 @@ The addon registers the Ashita v4 `text_in` event. When hiding is enabled, it
 blocks non-injected incoming text by setting `e.blocked = true`, except for
 native NPC dialog modes 150-152. Those modes must continue through FFXI's
 native event UI so choice menus such as Home Point destinations and Unity
-selection remain interactive. Injected lines are left visible so addon status
-messages can still be seen. FFXI's mode-190 legacy render copies of NPC dialog
-are blocked, preventing the native chat box from filling with duplicate
-cutscene text without interfering with the event itself.
+selection remain interactive. Their live payloads also bypass auto-translate
+parsing so encoded choice text is not altered before the native menu consumes
+it. Injected lines are left visible so addon status messages can still be seen.
+FFXI's mode-190 legacy render copies of NPC dialog are blocked, preventing the
+native chat box from filling with duplicate cutscene text without interfering
+with the event itself.
 
 It intentionally does not write to the legacy chat-window memory structures.
 Pinning those structures closed also suppresses unrelated interactive menus and

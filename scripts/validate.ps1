@@ -47,6 +47,7 @@ $required = @(
     "mark_matching_windows_scroll_to_bottom(message)",
     "message_color(display_mode, category)",
     "ParseAutoTranslate(text, true)",
+    "if (NATIVE_DIALOG_MODES[mode] ~= true)",
     "text:strip_colors():strip_translate(true)",
     "render_config_window()",
     "render_config_mode_checkbox(row, window_index, tab_index, mode_filter)",
