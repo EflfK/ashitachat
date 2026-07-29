@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.6';
+addon.version = '0.1.7';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1334,10 +1334,11 @@ local function history_text()
 
     for index = first, #state.messages do
         local message = state.messages[index];
-        table.insert(lines, ('        { time = %s, mode = %d, display_mode = %d, text = %s, display = %s },'):fmt(
+        table.insert(lines, ('        { time = %s, mode = %d, display_mode = %d, tell_peer = %s, text = %s, display = %s },'):fmt(
             config_string(message.time),
             bit.band(tonumber(message.mode) or 0, 0x000000FF),
             bit.band(tonumber(message.display_mode) or 0, 0x000000FF),
+            config_string(message.tell_peer or ''),
             config_string(message.text),
             config_string(message.display)));
     end
@@ -1389,6 +1390,7 @@ local function load_history()
             local display_mode = bit.band(tonumber(saved.display_mode) or mode, 0x000000FF);
             local text = clean_message(saved.text);
             local display = clean_message(saved.display or text);
+            local tell_peer = trim_string(saved.tell_peer):lower();
             if (text ~= '') then
                 local category = classify_message(display_mode, text);
                 state.message_seq = state.message_seq + 1;
@@ -1398,6 +1400,7 @@ local function load_history()
                     mode = mode,
                     display_mode = display_mode,
                     category = category,
+                    tell_peer = tell_peer ~= '' and tell_peer or nil,
                     text = text,
                     display = display,
                     search_text = (display .. ' ' .. text):lower(),
@@ -1432,6 +1435,10 @@ local function message_matches_tab(message, tab)
         return false;
     end
 
+    if (tab.tell_peer ~= nil) then
+        return message.tell_peer == tab.tell_peer;
+    end
+
     if ((tab.filters or {}).all == true) then
         return true;
     end
@@ -1446,6 +1453,76 @@ local function message_matches_tab(message, tab)
 
     for _, needle in ipairs(tab.contains or {}) do
         if (message.search_text:find(needle, 1, true) ~= nil) then
+            return true;
+        end
+    end
+
+    return false;
+end
+
+local function tell_peer_from_message(mode, text)
+    if (mode == 4) then
+        return text:match('^%s*([A-Za-z][A-Za-z0-9_-]*)>>');
+    elseif (mode == 12) then
+        return text:match('^%s*>>%s*([A-Za-z][A-Za-z0-9_-]*)%s*:');
+    end
+
+    return nil;
+end
+
+local function find_tell_tab(window, peer_key)
+    for _, tab in ipairs(window.tabs or {}) do
+        if (tab.tell_peer == peer_key) then
+            return tab;
+        end
+    end
+
+    return nil;
+end
+
+local function open_tell_tab(peer)
+    local window = state.windows[1];
+    local peer_key = trim_string(peer):lower();
+    if (window == nil or peer_key == '') then
+        return nil;
+    end
+
+    local existing = find_tell_tab(window, peer_key);
+    if (existing ~= nil) then
+        return existing;
+    end
+
+    local used_keys = {};
+    for _, tab in ipairs(window.tabs) do
+        used_keys[tab.key] = true;
+    end
+
+    local tab = normalize_tab({
+        key = 'tell-' .. peer_key,
+        label = peer,
+        modes = {},
+    }, #window.tabs + 1, used_keys);
+    tab.dynamic_tell = true;
+    tab.tell_peer = peer_key;
+    table.insert(window.tabs, tab);
+    rebuild_window_tab_lookup(window);
+
+    window.selected_tab = tab.key;
+    window.scroll_to_bottom = true;
+    window.visible[1] = true;
+    state.ui_visible[1] = true;
+    return tab;
+end
+
+local function close_tell_tab(window, tab_key)
+    for index, tab in ipairs(window.tabs or {}) do
+        if (tab.key == tab_key and tab.dynamic_tell == true) then
+            table.remove(window.tabs, index);
+            if (window.selected_tab == tab_key) then
+                window.selected_tab = window.tabs[1] and window.tabs[1].key or '';
+            end
+            rebuild_window_tab_lookup(window);
+            window.scroll_to_bottom = true;
             return true;
         end
     end
@@ -1493,6 +1570,8 @@ local function append_message(e)
 
     local category = classify_message(display_mode, text);
     local display = display_text(display_mode, text);
+    local tell_peer = tell_peer_from_message(mode, text);
+    local tell_peer_key = tell_peer ~= nil and tell_peer:lower() or nil;
 
     state.message_seq = state.message_seq + 1;
     local message = {
@@ -1501,6 +1580,7 @@ local function append_message(e)
         mode = mode,
         display_mode = display_mode,
         category = category,
+        tell_peer = tell_peer_key,
         text = text,
         display = display,
         search_text = (display .. ' ' .. text):lower(),
@@ -1510,6 +1590,10 @@ local function append_message(e)
 
     while (#state.messages > state.max_messages) do
         table.remove(state.messages, 1);
+    end
+
+    if (mode == 4 and tell_peer ~= nil) then
+        open_tell_tab(tell_peer);
     end
 
     mark_matching_windows_scroll_to_bottom(message);
@@ -1585,21 +1669,46 @@ local function track_window_layout(window)
     sync_editor_window_layout(window);
 end
 
-local function render_tabs(window)
+local function render_tabs(window, dynamic_only)
     local id = window_id(window);
-    for index, tab in ipairs(window.tabs) do
-        if (index > 1) then
-            imgui.SameLine(0, 2);
-        end
+    local rendered_count = 0;
+    local close_key = nil;
+    for _, tab in ipairs(window.tabs) do
+        if (dynamic_only ~= true or tab.dynamic_tell == true) then
+            if (rendered_count > 0) then
+                imgui.SameLine(0, 2);
+            end
 
-        local active = window.selected_tab == tab.key;
-        push_tab_style(active);
-        if (imgui.Button(('%s##ashitachat_%s_tab_%s'):fmt(tab.label, id, tab.key), { 98, 20 })) then
-            window.selected_tab = tab.key;
-            window.scroll_to_bottom = true;
+            local active = window.selected_tab == tab.key;
+            push_tab_style(active);
+            if (imgui.Button(('%s##ashitachat_%s_tab_%s'):fmt(tab.label, id, tab.key), { 98, 20 })) then
+                window.selected_tab = tab.key;
+                window.scroll_to_bottom = true;
+            end
+            if (tab.dynamic_tell == true) then
+                imgui.SameLine(0, 0);
+                if (imgui.Button(('x##ashitachat_%s_close_%s'):fmt(id, tab.key), { 20, 20 })) then
+                    close_key = tab.key;
+                end
+            end
+            pop_tab_style();
+            rendered_count = rendered_count + 1;
         end
-        pop_tab_style();
     end
+
+    if (close_key ~= nil) then
+        close_tell_tab(window, close_key);
+    end
+end
+
+local function has_tell_tabs(window)
+    for _, tab in ipairs(window.tabs or {}) do
+        if (tab.dynamic_tell == true) then
+            return true;
+        end
+    end
+
+    return false;
 end
 
 local function render_search(window, inline)
@@ -1754,7 +1863,10 @@ local function render_chat_window(window)
 
         local controls_visible = false;
         if (window.show_tabs == true) then
-            render_tabs(window);
+            render_tabs(window, false);
+            controls_visible = true;
+        elseif (has_tell_tabs(window)) then
+            render_tabs(window, true);
             controls_visible = true;
         end
         if (window.show_search == true) then

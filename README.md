@@ -40,6 +40,13 @@ selected window editor manages that window's chat tabs. Save writes
 `Ashita/config/addons/ashitachat/ashitachat_config.lua`, outside the addon
 folder, and render order is the order of entries in that file:
 
+Incoming tells automatically open a temporary conversation tab named for the
+sender in the first chat window. Replies to that player are routed into the
+same tab, keeping each tell conversation separate. Conversation tabs remain
+visible even when the window's normal tab bar is hidden, and each has an `x`
+button that closes the tab without deleting its messages from the bounded chat
+buffer. A later incoming tell from that player opens the tab again.
+
 ```lua
 return {
     windows = {
