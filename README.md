@@ -17,7 +17,9 @@ chat log with a translucent panel, tabs, search, and footer controls, or render
 as floating chat text with no visible bars or panel. It starts with one Main
 window containing four tabs:
 
-- General: all captured chat lines.
+- General: local/direct communication (NPC dialogue, say, tell, party, emote,
+  and assist), excluding shout, yell, linkshell, Linkshell 2, and Unity/global
+  traffic.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
@@ -56,7 +58,7 @@ return {
             show_scrollbar = false,
             background_opacity = 0.00,
             tabs = {
-                { key = 'general', label = 'General', filters = { 'all' } },
+                { key = 'general', label = 'General', modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
                 { key = 'lfg', label = 'LFG', filters = { 'lfg' } },

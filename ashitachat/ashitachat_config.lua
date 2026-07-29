@@ -17,7 +17,9 @@ return {
             tabs = {
                 -- Reorder tabs by moving these entries. Add more entries with
                 -- the same shape to create new tabs in this window.
-                { key = 'general', label = 'General', filters = { 'all' } },
+                -- Local/direct communication only: NPC, say, tell, party,
+                -- emote, and assist. Global and linkshell modes stay out.
+                { key = 'general', label = 'General', modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
                 { key = 'lfg', label = 'LFG', filters = { 'lfg' } },

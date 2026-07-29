@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.5';
+addon.version = '0.1.6';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -65,7 +65,7 @@ local COLORS = {
 };
 
 local DEFAULT_TABS = {
-    { key = 'general', label = 'General', filters = { 'all' } },
+    { key = 'general', label = 'General', modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
     { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
     { key = 'group', label = 'Group', filters = { 'group' } },
     { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
