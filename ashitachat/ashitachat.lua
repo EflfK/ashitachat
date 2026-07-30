@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.7';
+addon.version = '0.1.8';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -59,13 +59,14 @@ local COLORS = {
     group = { 0.55, 0.86, 1.00, 1.00 },
     lfg = { 1.00, 0.92, 0.28, 1.00 },
     status = { 0.62, 0.62, 0.66, 1.00 },
+    progress = { 1.00, 0.70, 0.25, 1.00 },
     empty = { 0.50, 0.50, 0.54, 1.00 },
     success = { 0.42, 0.95, 0.55, 1.00 },
     error = { 1.00, 0.36, 0.32, 1.00 },
 };
 
 local DEFAULT_TABS = {
-    { key = 'general', label = 'General', modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+    { key = 'general', label = 'General', filters = { 'progress' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
     { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
     { key = 'group', label = 'Group', filters = { 'group' } },
     { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
@@ -100,9 +101,10 @@ local VALID_FILTERS = {
     combat = true,
     group = true,
     lfg = true,
+    progress = true,
 };
 
-local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg' };
+local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg', 'progress' };
 
 local MODE_FILTERS = {
     { key = 'npc', label = 'NPC', modes = { 150, 151, 152 } },
@@ -410,11 +412,19 @@ local function normalize_tab(raw, index, used_keys)
     used_keys[key] = true;
 
     local modes, mode_map = normalize_modes(tab);
+    local filters = normalize_filters(tab);
+
+    -- Keep progression notices in the built-in/default chat even when an
+    -- existing saved config predates the progress filter.
+    if (key == 'general' and filters.progress ~= true) then
+        table.insert(filters, 'progress');
+        filters.progress = true;
+    end
 
     return {
         key = key,
         label = label,
-        filters = normalize_filters(tab),
+        filters = filters,
         modes = modes,
         mode_map = mode_map,
         contains = normalize_contains(tab),
@@ -1299,6 +1309,11 @@ local function classify_message(mode, text)
 
     if (mode == 4 or mode == 5 or mode == 12 or mode == 13 or mode == 210) then
         return 'group';
+    end
+
+    if (lower:match('^[a-z][a-z0-9_-]* caught %d+ .+!$') ~= nil
+        or lower:match("^[a-z][a-z0-9_-]*'s .+ skill rises %d+%.?%d* points?%.$") ~= nil) then
+        return 'progress';
     end
 
     if (COMBAT_MODES[mode] == true
