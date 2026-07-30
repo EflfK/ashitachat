@@ -18,8 +18,10 @@ as floating chat text with no visible bars or panel. It starts with one Main
 window containing four tabs:
 
 - General: local/direct communication (NPC dialogue, say, tell, party, emote,
-  and assist), plus fishing catches and skill-gain notices, excluding shout,
-  yell, linkshell, Linkshell 2, and Unity/global traffic.
+  and assist), plus fishing activity and skill-gain notices, excluding shout,
+  yell, linkshell, Linkshell 2, and Unity/global traffic. Fishing activity
+  includes bites, gut-feeling and skill warnings, catches, failures, line or
+  rod breaks, and common fishing setup errors.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
@@ -77,7 +79,7 @@ return {
 
 Each window can contain multiple tabs. Each tab can use `filters`, `modes`,
 and/or `contains`. Valid filters are `all`, `general`, `combat`, `group`, `lfg`,
-and `progress` for fishing catches and skill-gain notices. The tab whose key is
+and `progress` for fishing activity and skill-gain notices. The tab whose key is
 `general` always receives `progress`, so existing saved default configs gain
 these notices automatically. `modes` matches exact Ashita chat modes; the in-game config exposes
 common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`

@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.8';
+addon.version = '0.1.9';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1291,6 +1291,45 @@ local function lower_text(value)
     return clean_message(value):lower();
 end
 
+local FISHING_MESSAGE_PATTERNS = {
+    '^something caught the hook!+$',
+    '^you feel something pulling at your line%.$',
+    '^you feel something pulling on your line%.$',
+    '^something clamps onto your line ferociously!$',
+    '^you have a good feeling about this one!$',
+    '^you have a bad feeling about this one%.$',
+    '^you have a terrible feeling about this one%.%.%.$',
+    "^you're fairly sure you don't have enough skill to reel this one in%.$",
+    "^you don't know if you have enough skill to reel this one in%.$",
+    "^you're positive you don't have enough skill to reel this one in%.$",
+    "^you don't know how much longer you can keep this one on the line%.%.%.$",
+    "^you didn't catch anything[%.!]$",
+    '^you lost your catch[%.!]$',
+    '^whatever caught the hook was too small to catch[%.!]$',
+    '^your line breaks[%.!]$',
+    '^your .-rod breaks[%.!]$',
+    '^you give up on your catch[%.!]$',
+    '^you cannot fish.*[%.!]$',
+    "^you can't fish.*[%.!]$",
+    '^there are no fish here[%.!]$',
+    "^you do not have any bait on your hook[%.!]$",
+    "^you don't have any bait on your hook[%.!]$",
+    '^you must equip a fishing rod.*[%.!]$',
+    '^you are unable to fish.*[%.!]$',
+    '^[a-z][a-z0-9_-]* caught %d+ .+!$',
+    '^[a-z][a-z0-9_-]* caught an? .+!$',
+};
+
+local function is_fishing_message(lower)
+    for _, pattern in ipairs(FISHING_MESSAGE_PATTERNS) do
+        if (lower:match(pattern) ~= nil) then
+            return true;
+        end
+    end
+
+    return false;
+end
+
 local function classify_message(mode, text)
     local lower = lower_text(text);
 
@@ -1311,7 +1350,7 @@ local function classify_message(mode, text)
         return 'group';
     end
 
-    if (lower:match('^[a-z][a-z0-9_-]* caught %d+ .+!$') ~= nil
+    if (is_fishing_message(lower)
         or lower:match("^[a-z][a-z0-9_-]*'s .+ skill rises %d+%.?%d* points?%.$") ~= nil) then
         return 'progress';
     end
