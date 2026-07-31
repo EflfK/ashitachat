@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.11';
+addon.version = '0.1.12';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1329,6 +1329,7 @@ local FISHING_MESSAGE_PATTERNS = {
     '^hurry before the goldfish sees you!$',
     '^[a-z][a-z0-9_-]* caught .+[%.!]$',
     '^[a-z][a-z0-9_-]* fishes up .+[%.!]$',
+    "^[a-z][a-z0-9_-]*'s fishing skill reaches level %d+%.$",
 };
 
 local function is_fishing_message(lower)

@@ -47,6 +47,7 @@ $required = @(
     "the goldfish slipped off your scoop",
     "fishes up .+[%.!]$",
     "caught .+[%.!]$",
+    "fishing skill reaches level %d+%.$",
     "skill rises %d+%.?%d* points?%.$",
     "local NATIVE_DIALOG_MODES =",
     "{ key = 'npc', label = 'NPC', modes = { 150, 151, 152 } }",
