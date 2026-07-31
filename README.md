@@ -20,8 +20,9 @@ window containing four tabs:
 - General: local/direct communication (NPC dialogue, say, tell, party, emote,
   and assist), plus fishing activity and skill-gain notices, excluding shout,
   yell, linkshell, Linkshell 2, and Unity/global traffic. Fishing activity
-  includes bites, gut-feeling and skill warnings, catches, failures, line or
-  rod breaks, and common fishing setup errors.
+  includes bites, gut-feeling and skill warnings, catches (including monsters
+  and chests), failures, line or rod breaks, give-up messages, common fishing
+  setup errors, keen-angler/epic notices, and goldfish-scooping activity.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.

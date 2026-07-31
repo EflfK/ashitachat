@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.9';
+addon.version = '0.1.10';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1296,19 +1296,24 @@ local FISHING_MESSAGE_PATTERNS = {
     '^you feel something pulling at your line%.$',
     '^you feel something pulling on your line%.$',
     '^something clamps onto your line ferociously!$',
+    "^your keen angler's senses tell you .+[%.!]$",
+    '^this strength%.%.%. epic catch!$',
     '^you have a good feeling about this one!$',
     '^you have a bad feeling about this one%.$',
     '^you have a terrible feeling about this one%.%.%.$',
-    "^you're fairly sure you don't have enough skill to reel this one in%.$",
+    "^you're fairly sure you don't have enough skill to reel this one in[%.!]$",
     "^you don't know if you have enough skill to reel this one in%.$",
-    "^you're positive you don't have enough skill to reel this one in%.$",
+    "^you're positive you don't have enough skill to reel this one in[%.!]$",
+    '^your skill level is too low to catch .+[%.!]$',
     "^you don't know how much longer you can keep this one on the line%.%.%.$",
     "^you didn't catch anything[%.!]$",
-    '^you lost your catch[%.!]$',
+    '^you lost your catch.*[%.!]$',
     '^whatever caught the hook was too small to catch[%.!]$',
     '^your line breaks[%.!]$',
-    '^your .-rod breaks[%.!]$',
+    '^your .-rod breaks.*[%.!]$',
     '^you give up on your catch[%.!]$',
+    '^you give up and reel in your line[%.!]$',
+    '^you give up[%.!]$',
     '^you cannot fish.*[%.!]$',
     "^you can't fish.*[%.!]$",
     '^there are no fish here[%.!]$',
@@ -1316,8 +1321,13 @@ local FISHING_MESSAGE_PATTERNS = {
     "^you don't have any bait on your hook[%.!]$",
     '^you must equip a fishing rod.*[%.!]$',
     '^you are unable to fish.*[%.!]$',
-    '^[a-z][a-z0-9_-]* caught %d+ .+!$',
-    '^[a-z][a-z0-9_-]* caught an? .+!$',
+    '^the paper on your scoop ripped.*[%.!]$',
+    '^an? .-goldfish approaches!$',
+    '^there are no goldfish to be found%.%.%.$',
+    '^the goldfish slipped off your scoop%.%.%.$',
+    '^hurry before the goldfish sees you!$',
+    '^[a-z][a-z0-9_-]* caught .+[%.!]$',
+    '^[a-z][a-z0-9_-]* fishes up .+[%.!]$',
 };
 
 local function is_fishing_message(lower)
