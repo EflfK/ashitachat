@@ -33,6 +33,7 @@ $required = @(
     "local FISHING_MESSAGE_PATTERNS =",
     "local function is_fishing_message(lower)",
     "is_fishing_message(lower)",
+    "key == 'general' or key == 'default'",
     "something caught the hook!+",
     "enough skill to reel this one in",
     "keen angler's senses tell you",

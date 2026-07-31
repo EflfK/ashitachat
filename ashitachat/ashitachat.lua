@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.10';
+addon.version = '0.1.11';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -415,8 +415,9 @@ local function normalize_tab(raw, index, used_keys)
     local filters = normalize_filters(tab);
 
     -- Keep progression notices in the built-in/default chat even when an
-    -- existing saved config predates the progress filter.
-    if (key == 'general' and filters.progress ~= true) then
+    -- existing saved config predates the progress filter. Early saved configs
+    -- used "default" for this tab; current defaults use "general".
+    if ((key == 'general' or key == 'default') and filters.progress ~= true) then
         table.insert(filters, 'progress');
         filters.progress = true;
     end
