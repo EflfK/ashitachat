@@ -26,6 +26,7 @@ local IMGUI = {
     style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
     style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
+    cond_appearing = rawget(_G, 'ImGuiCond_Appearing') or imgui_const('ImGuiCond_FirstUseEver'),
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
     window_always_auto_resize = imgui_const('ImGuiWindowFlags_AlwaysAutoResize'),
@@ -1909,8 +1910,8 @@ local function render_chat_window(window)
     end
 
     local show_border = window.show_border == true;
-    imgui.SetNextWindowPos({ window.window_x, window.window_y }, IMGUI.cond_first_use);
-    imgui.SetNextWindowSize({ window.window_width, window.window_height }, IMGUI.cond_first_use);
+    imgui.SetNextWindowPos({ window.window_x, window.window_y }, IMGUI.cond_appearing);
+    imgui.SetNextWindowSize({ window.window_width, window.window_height }, IMGUI.cond_appearing);
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });

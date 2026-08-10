@@ -84,6 +84,7 @@ $required = @(
     "path_join(install_path, 'config')",
     "path_join(config_root, 'addons')",
     "window.window_x",
+    "IMGUI.cond_appearing",
     "window.window_width",
     "window.show_tabs",
     "window.show_search",
