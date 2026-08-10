@@ -24,6 +24,7 @@ return {
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
                 { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
+                { key = 'system', label = 'System', filters = { 'system' } },
 
                 -- Optional matching forms:
                 -- { key = 'shout', label = 'Shout', modes = { 2, 3, 10, 11 } },

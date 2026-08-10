@@ -1,12 +1,13 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.13';
+addon.version = '0.1.18';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
 
 local chat = require('chat');
 local imgui = require('imgui');
+local spectralfocus_modal = require('spectralfocus_modal');
 
 local function imgui_const(name)
     return rawget(_G, name) or 0;
@@ -26,6 +27,7 @@ local IMGUI = {
     style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
     style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
+    cond_always = imgui_const('ImGuiCond_Always'),
     cond_appearing = rawget(_G, 'ImGuiCond_Appearing') or imgui_const('ImGuiCond_FirstUseEver'),
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
@@ -449,6 +451,14 @@ local function normalize_tabs(source)
         for index, tab in ipairs(DEFAULT_TABS) do
             table.insert(tabs, normalize_tab(tab, index, used_keys));
         end
+    end
+
+    if (used_keys.system ~= true) then
+        table.insert(tabs, normalize_tab({
+            key = 'system',
+            label = 'System',
+            filters = { 'system' },
+        }, #tabs + 1, used_keys));
     end
 
     return tabs;
@@ -1258,10 +1268,6 @@ local function is_injected(e)
     return e.injected == true;
 end
 
-local function is_ashitachat_message(message)
-    return type(message) == 'string' and message:lower():find('%[ashitachat%]') ~= nil;
-end
-
 local function chat_mode(e)
     return bit.band(tonumber(e.mode) or 0, 0x000000FF);
 end
@@ -1349,6 +1355,10 @@ end
 
 local function classify_message(mode, text)
     local lower = lower_text(text);
+
+    if (mode == 29 or mode == 121) then
+        return 'system';
+    end
 
     if (lower:find('partyfinder', 1, true) ~= nil
         or lower:find('looking for group', 1, true) ~= nil
@@ -1620,12 +1630,8 @@ local function mark_matching_windows_scroll_to_bottom(message)
 end
 
 local function append_message(e)
-    if (is_injected(e)) then
-        return false;
-    end
-
     local mode = chat_mode(e);
-    local display_mode = chat_display_mode(e);
+    local display_mode = is_injected(e) and 29 or chat_display_mode(e);
     -- NPC dialog is emitted once in its original 150-152 modes, then
     -- reinjected for the legacy chat windows in mode 190. Capture the
     -- original event and ignore the reinjections so replacement windows do
@@ -1918,8 +1924,27 @@ local function render_chat_window(window)
     end
 
     local show_border = window.show_border == true;
-    imgui.SetNextWindowPos({ window.window_x, window.window_y }, IMGUI.cond_appearing);
-    imgui.SetNextWindowSize({ window.window_width, window.window_height }, IMGUI.cond_appearing);
+    local modal = spectralfocus_modal.is_active();
+    if (modal) then
+        local display_width, display_height = 5120, 1440;
+        local ok, io = pcall(function () return imgui.GetIO(); end);
+        if (ok and io ~= nil and io.DisplaySize ~= nil) then
+            display_width = tonumber(io.DisplaySize.x or io.DisplaySize[1]) or display_width;
+            display_height = tonumber(io.DisplaySize.y or io.DisplaySize[2]) or display_height;
+        end
+        local modal_width = math.min(2400, math.max(960, math.floor(display_width * 0.46)));
+        local modal_height = 230;
+        local modal_x = math.floor((display_width - modal_width) / 2);
+        local modal_y = math.max(40, display_height - modal_height - 310 - ((window.index or 1) - 1) * (modal_height + 8));
+        imgui.SetNextWindowPos({ modal_x, modal_y }, IMGUI.cond_always);
+        imgui.SetNextWindowSize({ modal_width, modal_height }, IMGUI.cond_always);
+        window.modal_was_active = true;
+    else
+        local restore_condition = window.modal_was_active == true and IMGUI.cond_always or IMGUI.cond_appearing;
+        imgui.SetNextWindowPos({ window.window_x, window.window_y }, restore_condition);
+        imgui.SetNextWindowSize({ window.window_width, window.window_height }, restore_condition);
+        window.modal_was_active = false;
+    end
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
@@ -1930,7 +1955,7 @@ local function render_chat_window(window)
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
     if (imgui.Begin(('AshitaChat - %s###AshitaChatWindow_%s'):fmt(window.label, window_id(window)), window.visible, window_flags)) then
-        track_window_layout(window);
+        if (not modal) then track_window_layout(window); end
 
         if (type(imgui.SetWindowFontScale) == 'function') then
             imgui.SetWindowFontScale(state.font_scale);
@@ -2631,10 +2656,6 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
         return;
     end
 
-    if (is_ashitachat_message(e.message)) then
-        return;
-    end
-
     local mode = chat_mode(e);
     if (mode == 190) then
         -- FFXI reinjects native NPC/event dialog as mode 190 for its legacy
@@ -2659,9 +2680,7 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
         return;
     end
 
-    if (not is_injected(e)) then
-        state.blocked_count = state.blocked_count + 1;
-        state.mode_counts[mode] = (state.mode_counts[mode] or 0) + 1;
-        e.blocked = true;
-    end
+    state.blocked_count = state.blocked_count + 1;
+    state.mode_counts[mode] = (state.mode_counts[mode] or 0) + 1;
+    e.blocked = true;
 end);

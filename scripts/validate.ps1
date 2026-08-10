@@ -100,7 +100,7 @@ $required = @(
     "load_lua_config_file(path)",
     "save_config()",
     "config_file_path()",
-    "if (is_injected(e)) then",
+    "local display_mode = is_injected(e) and 29 or chat_display_mode(e)",
     "render_chat_windows()",
     "toggle_native",
     "load_config();`n    local restored_count, history_error = load_history();`n    set_hidden(true);",
@@ -114,8 +114,7 @@ $required = @(
     "if (mode == 190 or display_mode == 190) then",
     "if (mode == 190) then",
     "state.mode_counts[mode] = (state.mode_counts[mode] or 0) + 1",
-    "is_ashitachat_message(e.message)",
-    "not is_injected(e)",
+    "if (mode == 29 or mode == 121) then",
     "NATIVE_DIALOG_MODES[mode] == true",
     "e.blocked = true"
 )
@@ -146,6 +145,8 @@ $requiredConfig = @(
     "filters = { 'combat' }",
     "filters = { 'group' }",
     "filters = { 'lfg' }",
+    "key = 'system'",
+    "filters = { 'system' }",
     "modes =",
     "contains ="
 )
