@@ -62,6 +62,7 @@ return {
             window_width = 840,
             window_height = 310,
             show_tabs = false,
+            tabs_on_bottom = false,
             show_search = false,
             show_footer = false,
             show_border = false,
@@ -90,8 +91,10 @@ The common mode checkboxes include `NPC`, which matches native NPC dialog modes
 so NPC dialog appears once. Legacy configs with top-level `tabs = { ... }`
 still load as a single Main window.
 
-Each window can also set `show_tabs`, `show_search`, `show_footer`,
-`show_border`, `show_scrollbar`, and `background_opacity`. Use
+Each window can also set `show_tabs`, `tabs_on_bottom`, `show_search`,
+`show_footer`, `show_border`, `show_scrollbar`, and `background_opacity`.
+Set `tabs_on_bottom = true` to keep the message list above a bottom-edge tab
+strip. Use
 `show_tabs = false`, `show_search = false`, `show_footer = false`,
 `show_border = false`, `show_scrollbar = false`, and
 `background_opacity = 0.00` for floating text with no visible chat chrome.

@@ -9,6 +9,7 @@ return {
             window_width = 840,
             window_height = 310,
             show_tabs = false,
+            tabs_on_bottom = false,
             show_search = false,
             show_footer = false,
             show_border = false,

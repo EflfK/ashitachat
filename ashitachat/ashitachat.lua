@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.12';
+addon.version = '0.1.13';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -481,6 +481,7 @@ local function normalize_window(raw, index, used_keys)
         window_width = normalize_int(source.window_width or source.width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
         window_height = normalize_int(source.window_height or source.height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX),
         show_tabs = normalize_visibility_option(source, { 'show_tabs', 'tabs_visible' }, { 'hide_tabs', 'tabs_hidden' }, DEFAULT_SHOW_TABS),
+        tabs_on_bottom = source.tabs_on_bottom == true or tostring(source.tabs_position or ''):lower() == 'bottom',
         show_search = normalize_visibility_option(source, { 'show_search', 'search_visible' }, { 'hide_search', 'search_hidden' }, DEFAULT_SHOW_SEARCH),
         show_footer = normalize_visibility_option(source, { 'show_footer', 'footer_visible' }, { 'hide_footer', 'footer_hidden' }, DEFAULT_SHOW_FOOTER),
         show_border = normalize_visibility_option(source, { 'show_border', 'border_visible' }, { 'hide_border', 'border_hidden' }, DEFAULT_SHOW_BORDER),
@@ -853,6 +854,7 @@ local function editor_from_window(window, index)
         window_width = window.window_width,
         window_height = window.window_height,
         show_tabs = window.show_tabs ~= false,
+        tabs_on_bottom = window.tabs_on_bottom == true,
         show_search = window.show_search ~= false,
         show_footer = window.show_footer ~= false,
         show_border = window.show_border ~= false,
@@ -908,6 +910,7 @@ local function config_editor_window(row, index)
         window_width = row.window_width,
         window_height = row.window_height,
         show_tabs = row.show_tabs ~= false,
+        tabs_on_bottom = row.tabs_on_bottom == true,
         show_search = row.show_search ~= false,
         show_footer = row.show_footer ~= false,
         show_border = row.show_border ~= false,
@@ -978,6 +981,7 @@ local function config_text_from_windows(windows)
         table.insert(lines, ('            window_width = %d,'):fmt(normalize_int(window.window_width, DEFAULT_WINDOW_WIDTH, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
         table.insert(lines, ('            window_height = %d,'):fmt(normalize_int(window.window_height, DEFAULT_WINDOW_HEIGHT, WINDOW_SIZE_MIN, WINDOW_SIZE_MAX)));
         table.insert(lines, ('            show_tabs = %s,'):fmt(window.show_tabs == true and 'true' or 'false'));
+        table.insert(lines, ('            tabs_on_bottom = %s,'):fmt(window.tabs_on_bottom == true and 'true' or 'false'));
         table.insert(lines, ('            show_search = %s,'):fmt(window.show_search == true and 'true' or 'false'));
         table.insert(lines, ('            show_footer = %s,'):fmt(window.show_footer == true and 'true' or 'false'));
         table.insert(lines, ('            show_border = %s,'):fmt(window.show_border == true and 'true' or 'false'));
@@ -1843,7 +1847,11 @@ end
 local function render_message_list(window)
     local query = normalized_search(window);
     local selected_tab = window.tab_by_key[window.selected_tab] or window.tabs[1];
-    local child_height = window.show_footer == true and -24 or 0;
+    local reserved_height = window.show_footer == true and 24 or 0;
+    if (window.show_tabs == true and window.tabs_on_bottom == true) then
+        reserved_height = reserved_height + 30;
+    end
+    local child_height = reserved_height > 0 and -reserved_height or 0;
     local child_flags = window.show_scrollbar == true and 0 or IMGUI.window_no_scrollbar;
     local child_open, child_visible = begin_child(('##ashitachat_%s_message_list'):fmt(window_id(window)), { 0, child_height }, false, child_flags);
     local visible_count = 0;
@@ -1928,11 +1936,12 @@ local function render_chat_window(window)
             imgui.SetWindowFontScale(state.font_scale);
         end
 
+        local tabs_on_bottom = window.show_tabs == true and window.tabs_on_bottom == true;
         local controls_visible = false;
-        if (window.show_tabs == true) then
+        if (window.show_tabs == true and not tabs_on_bottom) then
             render_tabs(window, false);
             controls_visible = true;
-        elseif (has_tell_tabs(window)) then
+        elseif (window.show_tabs ~= true and has_tell_tabs(window)) then
             render_tabs(window, true);
             controls_visible = true;
         end
@@ -1947,6 +1956,10 @@ local function render_chat_window(window)
         local visible_count = render_message_list(window);
         if (window.show_footer == true) then
             render_footer(window, visible_count);
+        end
+        if (tabs_on_bottom) then
+            imgui.Separator();
+            render_tabs(window, false);
         end
     end
 
@@ -2222,6 +2235,12 @@ local function render_config_window_editor(index, row)
     local show_tabs = row.show_tabs ~= false;
     if (imgui.Checkbox(('Tabs##ashitachat_config_window_%d_show_tabs'):fmt(index), { show_tabs })) then
         row.show_tabs = not show_tabs;
+        mark_config_dirty();
+    end
+    imgui.SameLine(0, 8);
+    local tabs_on_bottom = row.tabs_on_bottom == true;
+    if (imgui.Checkbox(('Tabs on Bottom##ashitachat_config_window_%d_tabs_on_bottom'):fmt(index), { tabs_on_bottom })) then
+        row.tabs_on_bottom = not tabs_on_bottom;
         mark_config_dirty();
     end
     imgui.SameLine(0, 8);
