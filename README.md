@@ -106,6 +106,12 @@ Each window also stores `window_x`, `window_y`, `window_width`, and
 `/ashitachat config` to persist its placement in the config folder outside the
 addon install.
 
+When a native task-focused menu activates the temporary centered chat layout,
+each chat window eases its position and size over a short, non-overshooting
+transition. Closing or changing the menu mid-motion redirects the window from
+its current geometry, and manual movement remains immediate in the normal
+layout.
+
 AshitaChat also saves the most recent 100 captured lines when the addon unloads
 and restores them on its next load. The bounded history lives at
 `Ashita/config/addons/ashitachat/ashitachat_history.lua`, so addon reloads and

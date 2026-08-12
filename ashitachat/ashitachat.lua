@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.18';
+addon.version = '0.1.19';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -97,6 +97,7 @@ local BACKGROUND_OPACITY_MIN = 0.00;
 local BACKGROUND_OPACITY_MAX = 1.00;
 local HISTORY_VERSION = 2;
 local HISTORY_MESSAGE_LIMIT = 100;
+local LAYOUT_ANIMATION_RESPONSE = 22;
 
 local VALID_FILTERS = {
     all = true,
@@ -1925,6 +1926,10 @@ local function render_chat_window(window)
 
     local show_border = window.show_border == true;
     local modal = spectralfocus_modal.is_active();
+    local target_x = window.window_x;
+    local target_y = window.window_y;
+    local target_width = window.window_width;
+    local target_height = window.window_height;
     if (modal) then
         local display_width, display_height = 5120, 1440;
         local ok, io = pcall(function () return imgui.GetIO(); end);
@@ -1932,18 +1937,50 @@ local function render_chat_window(window)
             display_width = tonumber(io.DisplaySize.x or io.DisplaySize[1]) or display_width;
             display_height = tonumber(io.DisplaySize.y or io.DisplaySize[2]) or display_height;
         end
-        local modal_width = math.min(2400, math.max(960, math.floor(display_width * 0.46)));
-        local modal_height = 230;
-        local modal_x = math.floor((display_width - modal_width) / 2);
-        local modal_y = math.max(40, display_height - modal_height - 310 - ((window.index or 1) - 1) * (modal_height + 8));
-        imgui.SetNextWindowPos({ modal_x, modal_y }, IMGUI.cond_always);
-        imgui.SetNextWindowSize({ modal_width, modal_height }, IMGUI.cond_always);
-        window.modal_was_active = true;
+        target_width = math.min(2400, math.max(960, math.floor(display_width * 0.46)));
+        target_height = 230;
+        target_x = math.floor((display_width - target_width) / 2);
+        target_y = math.max(40, display_height - target_height - 310 - ((window.index or 1) - 1) * (target_height + 8));
+    end
+
+    local transitioning = modal or window.modal_was_active == true;
+    if (transitioning) then
+        local now = os.clock();
+        local motion = window.layout_motion;
+        if (motion == nil) then
+            motion = {
+                x = window.window_x,
+                y = window.window_y,
+                width = window.window_width,
+                height = window.window_height,
+                updated_at = now,
+            };
+            window.layout_motion = motion;
+        end
+        local elapsed = math.max(0, math.min(0.10, now - motion.updated_at));
+        motion.updated_at = now;
+        local blend = 1 - math.exp(-LAYOUT_ANIMATION_RESPONSE * elapsed);
+        motion.x = motion.x + ((target_x - motion.x) * blend);
+        motion.y = motion.y + ((target_y - motion.y) * blend);
+        motion.width = motion.width + ((target_width - motion.width) * blend);
+        motion.height = motion.height + ((target_height - motion.height) * blend);
+        local settled = math.abs(target_x - motion.x) < 0.5
+            and math.abs(target_y - motion.y) < 0.5
+            and math.abs(target_width - motion.width) < 0.5
+            and math.abs(target_height - motion.height) < 0.5;
+        if (settled) then
+            motion.x, motion.y = target_x, target_y;
+            motion.width, motion.height = target_width, target_height;
+        end
+        imgui.SetNextWindowPos({ motion.x, motion.y }, IMGUI.cond_always);
+        imgui.SetNextWindowSize({ motion.width, motion.height }, IMGUI.cond_always);
+        window.modal_was_active = modal or not settled;
+        if (modal ~= true and settled) then
+            window.layout_motion = nil;
+        end
     else
-        local restore_condition = window.modal_was_active == true and IMGUI.cond_always or IMGUI.cond_appearing;
-        imgui.SetNextWindowPos({ window.window_x, window.window_y }, restore_condition);
-        imgui.SetNextWindowSize({ window.window_width, window.window_height }, restore_condition);
-        window.modal_was_active = false;
+        imgui.SetNextWindowPos({ target_x, target_y }, IMGUI.cond_appearing);
+        imgui.SetNextWindowSize({ target_width, target_height }, IMGUI.cond_appearing);
     end
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
@@ -1955,7 +1992,7 @@ local function render_chat_window(window)
     imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.frame_hover);
 
     if (imgui.Begin(('AshitaChat - %s###AshitaChatWindow_%s'):fmt(window.label, window_id(window)), window.visible, window_flags)) then
-        if (not modal) then track_window_layout(window); end
+        if (not modal and window.layout_motion == nil) then track_window_layout(window); end
 
         if (type(imgui.SetWindowFontScale) == 'function') then
             imgui.SetWindowFontScale(state.font_scale);
