@@ -15,7 +15,7 @@ This version renders draggable, resizable ImGui replacement chat windows with
 configurable chrome and background opacity. It can stay close to the native FFXI
 chat log with a translucent panel, tabs, search, and footer controls, or render
 as floating chat text with no visible bars or panel. It starts with one Main
-window containing four tabs:
+window containing six tabs:
 
 - General: local/direct communication (NPC dialogue, say, tell, party, emote,
   and assist), plus fishing activity and skill-gain notices, excluding shout,
@@ -23,9 +23,11 @@ window containing four tabs:
   includes bites, gut-feeling and skill warnings, catches (including monsters
   and chests), failures, line or rod breaks, give-up messages, common fishing
   setup errors, keen-angler/epic notices, and goldfish-scooping activity.
+- Whisper: all incoming and outgoing tell messages.
 - Combat Log: battle, casting, damage, and status-effect style lines.
 - Group: party and tell lines.
 - LFG: lines that look like party finder, recruiting, LFG, or LFM traffic.
+- System: addon and system-status lines.
 
 Each window includes its own tab selection, search field, footer controls, and
 scroll state over the same bounded local chat buffer when those controls are
@@ -70,6 +72,7 @@ return {
             background_opacity = 0.00,
             tabs = {
                 { key = 'general', label = 'General', filters = { 'progress' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+                { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
                 { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
@@ -187,6 +190,7 @@ startup script.
 /ashitachat config
 /ashitachat clear
 /ashitachat tab general
+/ashitachat tab whisper
 /ashitachat tab combat main
 /ashitachat tab combat
 /ashitachat tab group

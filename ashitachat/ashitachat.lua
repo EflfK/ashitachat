@@ -70,6 +70,7 @@ local COLORS = {
 
 local DEFAULT_TABS = {
     { key = 'general', label = 'General', filters = { 'progress' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+    { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
     { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
     { key = 'group', label = 'Group', filters = { 'group' } },
     { key = 'lfg', label = 'LFG', filters = { 'lfg' } },
@@ -452,6 +453,25 @@ local function normalize_tabs(source)
         for index, tab in ipairs(DEFAULT_TABS) do
             table.insert(tabs, normalize_tab(tab, index, used_keys));
         end
+    end
+
+    -- Existing saved configurations predate the aggregate tell tab. Add it at
+    -- load time so installed configurations gain the feature without losing
+    -- their window layout or custom tabs.
+    if (used_keys.whisper ~= true) then
+        local insert_at = #tabs + 1;
+        for index, tab in ipairs(tabs) do
+            if (tab.key == 'general' or tab.key == 'default') then
+                insert_at = index + 1;
+                break;
+            end
+        end
+
+        table.insert(tabs, insert_at, normalize_tab({
+            key = 'whisper',
+            label = 'Whisper',
+            modes = { 4, 12 },
+        }, insert_at, used_keys));
     end
 
     if (used_keys.system ~= true) then
