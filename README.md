@@ -101,8 +101,10 @@ strip. Use
 `show_tabs = false`, `show_search = false`, `show_footer = false`,
 `show_border = false`, `show_scrollbar = false`, and
 `background_opacity = 0.00` for floating text with no visible chat chrome.
-When the mouse is over a chat window, its background temporarily becomes at
-least 78% opaque so the text and controls are easier to read and use.
+When the mouse enters a chat window, its background fades to at least 78%
+opacity over 0.30 seconds so the text and controls are easier to read and use.
+It fades back to the configured opacity over 0.45 seconds after the mouse
+leaves, matching AshitaMiniMap's hover behavior.
 The loader also accepts negative aliases such as `hide_tabs = true` and
 `hide_search = true` for hand-written configs.
 
