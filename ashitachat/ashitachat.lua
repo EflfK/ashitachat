@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.19';
+addon.version = '0.1.20';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -33,6 +33,7 @@ local IMGUI = {
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
     window_always_auto_resize = imgui_const('ImGuiWindowFlags_AlwaysAutoResize'),
     window_no_scrollbar = imgui_const('ImGuiWindowFlags_NoScrollbar'),
+    hovered_child_windows = imgui_const('ImGuiHoveredFlags_ChildWindows'),
 };
 
 local COLORS = {
@@ -90,6 +91,7 @@ local DEFAULT_SHOW_FOOTER = true;
 local DEFAULT_SHOW_BORDER = true;
 local DEFAULT_SHOW_SCROLLBAR = true;
 local DEFAULT_BACKGROUND_OPACITY = 0.74;
+local HOVER_BACKGROUND_OPACITY = 0.78;
 local WINDOW_POSITION_MIN = -2000;
 local WINDOW_POSITION_MAX = 10000;
 local WINDOW_SIZE_MIN = 120;
@@ -2005,7 +2007,10 @@ local function render_chat_window(window)
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
-    imgui.PushStyleColor(IMGUI.col_window_bg, color_with_alpha(COLORS.panel_bg, window.background_opacity));
+    local background_opacity = window.hovered == true
+        and math.max(window.background_opacity, HOVER_BACKGROUND_OPACITY)
+        or window.background_opacity;
+    imgui.PushStyleColor(IMGUI.col_window_bg, color_with_alpha(COLORS.panel_bg, background_opacity));
     imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
     imgui.PushStyleColor(IMGUI.col_border, show_border and COLORS.border or color_with_alpha(COLORS.border, 0.0));
     imgui.PushStyleColor(IMGUI.col_frame_bg, COLORS.frame);
@@ -2045,6 +2050,9 @@ local function render_chat_window(window)
         end
     end
 
+    window.hovered = type(imgui.IsWindowHovered) == 'function'
+        and imgui.IsWindowHovered(IMGUI.hovered_child_windows)
+        or false;
     imgui.End();
     imgui.PopStyleColor(5);
     imgui.PopStyleVar(3);

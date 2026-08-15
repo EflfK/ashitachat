@@ -95,6 +95,8 @@ $required = @(
     "window.show_border",
     "window.show_scrollbar",
     "window.background_opacity",
+    "HOVER_BACKGROUND_OPACITY",
+    "imgui.IsWindowHovered(IMGUI.hovered_child_windows)",
     "track_window_layout(window)",
     "ensure_config_dir()",
     "legacy_config_file_path()",
