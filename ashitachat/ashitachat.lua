@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.21';
+addon.version = '0.1.22';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -25,6 +25,7 @@ local IMGUI = {
     col_text = imgui_const('ImGuiCol_Text'),
     style_window_padding = imgui_const('ImGuiStyleVar_WindowPadding'),
     style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
+    style_window_rounding = imgui_const('ImGuiStyleVar_WindowRounding'),
     style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
     cond_always = imgui_const('ImGuiCond_Always'),
@@ -2026,6 +2027,7 @@ local function render_chat_window(window)
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, show_border and 1.0 or 0.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
+    imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
     local hover_focus = update_hover_focus(window, window.hovered == true);
     local hover_opacity = math.max(window.background_opacity, HOVER_BACKGROUND_OPACITY);
     local background_opacity = window.background_opacity
@@ -2075,7 +2077,7 @@ local function render_chat_window(window)
         or false;
     imgui.End();
     imgui.PopStyleColor(5);
-    imgui.PopStyleVar(3);
+    imgui.PopStyleVar(4);
 end
 
 local function render_chat_windows()
