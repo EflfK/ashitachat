@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.23';
+addon.version = '0.1.24';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -71,7 +71,7 @@ local COLORS = {
 };
 
 local DEFAULT_TABS = {
-    { key = 'general', label = 'General', filters = { 'progress' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+    { key = 'general', label = 'General', filters = { 'progress', 'auction' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
     { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
     { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
     { key = 'group', label = 'Group', filters = { 'group' } },
@@ -112,9 +112,10 @@ local VALID_FILTERS = {
     group = true,
     lfg = true,
     progress = true,
+    auction = true,
 };
 
-local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg', 'progress' };
+local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg', 'progress', 'auction' };
 
 local MODE_FILTERS = {
     { key = 'npc', label = 'NPC', modes = { 150, 151, 152 } },
@@ -431,12 +432,16 @@ local function normalize_tab(raw, index, used_keys)
     local modes, mode_map = normalize_modes(tab);
     local filters = normalize_filters(tab);
 
-    -- Keep progression notices in the built-in/default chat even when an
-    -- existing saved config predates the progress filter. Early saved configs
-    -- used "default" for this tab; current defaults use "general".
-    if ((key == 'general' or key == 'default') and filters.progress ~= true) then
-        table.insert(filters, 'progress');
-        filters.progress = true;
+    -- Keep progression and Auction House purchase notices in the built-in
+    -- default chat even when an existing saved config predates these filters.
+    -- Early saved configs used "default"; current defaults use "general".
+    if (key == 'general' or key == 'default') then
+        for _, filter in ipairs({ 'progress', 'auction' }) do
+            if (filters[filter] ~= true) then
+                table.insert(filters, filter);
+                filters[filter] = true;
+            end
+        end
     end
 
     return {
@@ -1398,6 +1403,11 @@ end
 
 local function classify_message(mode, text)
     local lower = lower_text(text);
+
+    if (lower:find('you buy the ', 1, true) == 1
+        or lower:find('you were unable to buy the ', 1, true) == 1) then
+        return 'auction';
+    end
 
     if (mode == 29 or mode == 121) then
         return 'system';
