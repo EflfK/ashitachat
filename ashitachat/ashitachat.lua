@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.24';
+addon.version = '0.1.25';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -71,7 +71,7 @@ local COLORS = {
 };
 
 local DEFAULT_TABS = {
-    { key = 'general', label = 'General', filters = { 'progress', 'auction' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+    { key = 'general', label = 'General', filters = { 'progress', 'auction', 'mission' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
     { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
     { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
     { key = 'group', label = 'Group', filters = { 'group' } },
@@ -113,9 +113,10 @@ local VALID_FILTERS = {
     lfg = true,
     progress = true,
     auction = true,
+    mission = true,
 };
 
-local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg', 'progress', 'auction' };
+local FILTER_ORDER = { 'all', 'general', 'combat', 'group', 'lfg', 'progress', 'auction', 'mission' };
 
 local MODE_FILTERS = {
     { key = 'npc', label = 'NPC', modes = { 150, 151, 152 } },
@@ -432,11 +433,12 @@ local function normalize_tab(raw, index, used_keys)
     local modes, mode_map = normalize_modes(tab);
     local filters = normalize_filters(tab);
 
-    -- Keep progression and Auction House purchase notices in the built-in
-    -- default chat even when an existing saved config predates these filters.
-    -- Early saved configs used "default"; current defaults use "general".
+    -- Keep progression, Auction House purchase, and mission/quest lifecycle
+    -- notices in the built-in default chat even when an existing saved config
+    -- predates these filters. Early configs used "default"; current defaults
+    -- use "general".
     if (key == 'general' or key == 'default') then
-        for _, filter in ipairs({ 'progress', 'auction' }) do
+        for _, filter in ipairs({ 'progress', 'auction', 'mission' }) do
             if (filters[filter] ~= true) then
                 table.insert(filters, filter);
                 filters[filter] = true;
@@ -1401,8 +1403,37 @@ local function is_fishing_message(lower)
     return false;
 end
 
+local MISSION_UPDATE_PATTERNS = {
+    '^you have accepted .-mission',
+    '^you have accepted .-quest',
+    '^you have completed .-mission',
+    '^you have completed .-quest',
+    '^mission accepted',
+    '^quest accepted',
+    '^mission complete',
+    '^quest complete',
+    '^mission failed',
+    '^quest failed',
+    '^mission abandoned',
+    '^quest abandoned',
+};
+
+local function is_mission_update(lower)
+    for _, pattern in ipairs(MISSION_UPDATE_PATTERNS) do
+        if (lower:match(pattern) ~= nil) then
+            return true;
+        end
+    end
+
+    return false;
+end
+
 local function classify_message(mode, text)
     local lower = lower_text(text);
+
+    if (is_mission_update(lower)) then
+        return 'mission';
+    end
 
     if (lower:find('you buy the ', 1, true) == 1
         or lower:find('you were unable to buy the ', 1, true) == 1) then

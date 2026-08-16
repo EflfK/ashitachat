@@ -71,7 +71,7 @@ return {
             show_scrollbar = false,
             background_opacity = 0.00,
             tabs = {
-                { key = 'general', label = 'General', filters = { 'progress', 'auction' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+                { key = 'general', label = 'General', filters = { 'progress', 'auction', 'mission' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
                 { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
@@ -84,10 +84,12 @@ return {
 
 Each window can contain multiple tabs. Each tab can use `filters`, `modes`,
 `contains`, and/or `excludes`. Valid filters are `all`, `general`, `combat`,
-`group`, `lfg`, `progress` for fishing activity and skill-gain notices, and
-`auction` for successful and unsuccessful Auction House purchase notices. Tabs
-keyed `general` or the legacy `default` always receive `progress` and `auction`,
-so existing saved default configs gain these notices automatically. `modes`
+`group`, `lfg`, `progress` for fishing activity and skill-gain notices,
+`auction` for successful and unsuccessful Auction House purchase notices, and
+`mission` for accepted, completed, failed, or abandoned mission and quest
+notices. Tabs keyed `general` or the legacy `default` always receive `progress`,
+`auction`, and `mission`, so existing saved default configs gain these notices
+automatically. `modes`
 matches exact Ashita chat modes; the in-game config exposes
 common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
 field for exact/custom IDs. `contains` matches case-insensitive text fragments.

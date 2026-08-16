@@ -20,7 +20,7 @@ return {
                 -- the same shape to create new tabs in this window.
                 -- Local/direct communication only: NPC, say, tell, party,
                 -- emote, and assist. Global and linkshell modes stay out.
-                { key = 'general', label = 'General', filters = { 'progress', 'auction' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
+                { key = 'general', label = 'General', filters = { 'progress', 'auction', 'mission' }, modes = { 1, 4, 5, 8, 9, 12, 13, 150, 151, 152, 210, 220, 222 } },
                 { key = 'whisper', label = 'Whisper', modes = { 4, 12 } },
                 { key = 'combat', label = 'Combat Log', filters = { 'combat' } },
                 { key = 'group', label = 'Group', filters = { 'group' } },
