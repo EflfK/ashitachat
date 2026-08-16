@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.22';
+addon.version = '0.1.23';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -313,9 +313,8 @@ local function normalize_modes(tab)
     return modes, mode_map;
 end
 
-local function normalize_contains(tab)
-    local source = tab.contains or tab.contain or {};
-    local contains = {};
+local function normalize_text_fragments(source)
+    local fragments = {};
 
     if (type(source) ~= 'table') then
         source = { source };
@@ -324,11 +323,19 @@ local function normalize_contains(tab)
     for _, value in ipairs(source) do
         local needle = trim_string(value):lower();
         if (needle ~= '') then
-            table.insert(contains, needle);
+            table.insert(fragments, needle);
         end
     end
 
-    return contains;
+    return fragments;
+end
+
+local function normalize_contains(tab)
+    return normalize_text_fragments(tab.contains or tab.contain or {});
+end
+
+local function normalize_excludes(tab)
+    return normalize_text_fragments(tab.excludes or tab.exclude or {});
 end
 
 local function normalize_int(value, fallback, minimum, maximum)
@@ -439,6 +446,7 @@ local function normalize_tab(raw, index, used_keys)
         modes = modes,
         mode_map = mode_map,
         contains = normalize_contains(tab),
+        excludes = normalize_excludes(tab),
     };
 end
 
@@ -841,6 +849,7 @@ local function editor_from_tab(tab, index)
         mode_map = mode_map_from_list(modes),
         modes_buffer = T{ list_text(modes) },
         contains_buffer = T{ list_text(tab.contains) },
+        excludes_buffer = T{ list_text(tab.excludes) },
     };
 end
 
@@ -863,6 +872,7 @@ local function config_editor_tab(row, index)
         filters = filters,
         modes = parse_mode_list(row.modes_buffer and row.modes_buffer[1] or ''),
         contains = parse_text_list(row.contains_buffer and row.contains_buffer[1] or ''),
+        excludes = parse_text_list(row.excludes_buffer and row.excludes_buffer[1] or ''),
     };
 end
 
@@ -988,6 +998,9 @@ local function tab_config_fields(tab)
     end
     if (#(tab.contains or {}) > 0) then
         table.insert(fields, ('contains = %s'):fmt(config_list(tab.contains, true)));
+    end
+    if (#(tab.excludes or {}) > 0) then
+        table.insert(fields, ('excludes = %s'):fmt(config_list(tab.excludes, true)));
     end
 
     return fields;
@@ -1221,6 +1234,10 @@ local function filters_summary(tab)
 
     for _, needle in ipairs(tab.contains or {}) do
         table.insert(parts, ('contains:%s'):fmt(needle));
+    end
+
+    for _, needle in ipairs(tab.excludes or {}) do
+        table.insert(parts, ('excludes:%s'):fmt(needle));
     end
 
     if (#parts == 0) then
@@ -1544,6 +1561,12 @@ local function message_matches_tab(message, tab)
 
     if (tab.tell_peer ~= nil) then
         return message.tell_peer == tab.tell_peer;
+    end
+
+    for _, needle in ipairs(tab.excludes or {}) do
+        if (message.search_text:find(needle, 1, true) ~= nil) then
+            return false;
+        end
     end
 
     if ((tab.filters or {}).all == true) then
@@ -2164,6 +2187,7 @@ local function add_config_tab(window_index)
         filters = { 'general' },
         modes = {},
         contains = {},
+        excludes = {},
     }, index));
     mark_config_dirty();
 end
@@ -2276,6 +2300,9 @@ local function render_config_tab_editor(window_index, index, row)
         mark_config_dirty();
     end
     if (imgui.InputText(('Contains##ashitachat_config_window_%d_tab_%d_contains'):fmt(window_index, index), row.contains_buffer, 256)) then
+        mark_config_dirty();
+    end
+    if (imgui.InputText(('Excludes##ashitachat_config_window_%d_tab_%d_excludes'):fmt(window_index, index), row.excludes_buffer, 256)) then
         mark_config_dirty();
     end
     imgui.PopItemWidth();

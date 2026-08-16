@@ -54,6 +54,9 @@ $required = @(
     "local NATIVE_DIALOG_MODES =",
     "{ key = 'npc', label = 'NPC', modes = { 150, 151, 152 } }",
     "message_matches_tab(message, tab)",
+    "local function normalize_excludes(tab)",
+    "for _, needle in ipairs(tab.excludes or {}) do",
+    "Excludes##ashitachat_config_window_%d_tab_%d_excludes",
     "tell_peer_from_message(mode, text)",
     "text:match('^%s*([A-Za-z][A-Za-z0-9_-]*)>>')",
     "text:match('^%s*>>%s*([A-Za-z][A-Za-z0-9_-]*)%s*:')",
@@ -156,7 +159,8 @@ $requiredConfig = @(
     "key = 'system'",
     "filters = { 'system' }",
     "modes =",
-    "contains ="
+    "contains =",
+    "excludes ="
 )
 
 foreach ($needle in $requiredConfig) {

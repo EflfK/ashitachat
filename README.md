@@ -83,12 +83,15 @@ return {
 ```
 
 Each window can contain multiple tabs. Each tab can use `filters`, `modes`,
-and/or `contains`. Valid filters are `all`, `general`, `combat`, `group`, `lfg`,
+`contains`, and/or `excludes`. Valid filters are `all`, `general`, `combat`,
+`group`, `lfg`,
 and `progress` for fishing activity and skill-gain notices. Tabs keyed `general`
 or the legacy `default` always receive `progress`, so existing saved default
 configs gain these notices automatically. `modes` matches exact Ashita chat modes; the in-game config exposes
 common mode groups as checkboxes and keeps a raw comma-separated `Mode IDs`
 field for exact/custom IDs. `contains` matches case-insensitive text fragments.
+`excludes` rejects matching case-insensitive fragments after the inclusion rules,
+so a broad tab can omit noisy addon notices while an `all` tab still retains them.
 The common mode checkboxes include `NPC`, which matches native NPC dialog modes
 150-152. Ashita's mode-190 legacy-chat reinjections are intentionally ignored
 so NPC dialog appears once. Legacy configs with top-level `tabs = { ... }`

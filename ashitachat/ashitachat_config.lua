@@ -30,6 +30,7 @@ return {
                 -- Optional matching forms:
                 -- { key = 'shout', label = 'Shout', modes = { 2, 3, 10, 11 } },
                 -- { key = 'sales', label = 'Sales', contains = { 'wts', 'wtb', 'sell?' } },
+                -- { key = 'quiet', label = 'Quiet', filters = { 'all' }, excludes = { 'ring2 disabled.', 'ring2 enabled.' } },
                 -- { key = 'social', label = 'Social', filters = { 'general', 'group' } },
             },
         },
