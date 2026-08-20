@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.25';
+addon.version = '0.1.26';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1499,10 +1499,11 @@ local function history_text()
 
     for index = first, #state.messages do
         local message = state.messages[index];
-        table.insert(lines, ('        { time = %s, mode = %d, display_mode = %d, tell_peer = %s, text = %s, display = %s },'):fmt(
+        table.insert(lines, ('        { time = %s, mode = %d, display_mode = %d, injected = %s, tell_peer = %s, text = %s, display = %s },'):fmt(
             config_string(message.time),
             bit.band(tonumber(message.mode) or 0, 0x000000FF),
             bit.band(tonumber(message.display_mode) or 0, 0x000000FF),
+            tostring(message.injected == true),
             config_string(message.tell_peer or ''),
             config_string(message.text),
             config_string(message.display)));
@@ -1553,6 +1554,7 @@ local function load_history()
         if (type(saved) == 'table' and type(saved.text) == 'string') then
             local mode = bit.band(tonumber(saved.mode) or 0, 0x000000FF);
             local display_mode = bit.band(tonumber(saved.display_mode) or mode, 0x000000FF);
+            local injected = saved.injected == true or (display_mode == 29 and mode ~= 29);
             local text = clean_message(saved.text);
             local display = clean_message(saved.display or text);
             local tell_peer = trim_string(saved.tell_peer):lower();
@@ -1564,6 +1566,7 @@ local function load_history()
                     time = type(saved.time) == 'string' and saved.time:match('^%d%d:%d%d:%d%d$') and saved.time or os.date('%H:%M:%S'),
                     mode = mode,
                     display_mode = display_mode,
+                    injected = injected,
                     category = category,
                     tell_peer = tell_peer ~= '' and tell_peer or nil,
                     text = text,
@@ -1602,6 +1605,12 @@ local function message_matches_tab(message, tab)
 
     if (tab.tell_peer ~= nil) then
         return message.tell_peer == tab.tell_peer;
+    end
+
+    -- Addon print/status lines are useful in System or All, but the default
+    -- player-facing tab should contain game chat and gameplay notices only.
+    if ((tab.key == 'general' or tab.key == 'default') and message.injected == true) then
+        return false;
     end
 
     for _, needle in ipairs(tab.excludes or {}) do
@@ -1721,7 +1730,8 @@ end
 
 local function append_message(e)
     local mode = chat_mode(e);
-    local display_mode = is_injected(e) and 29 or chat_display_mode(e);
+    local injected = is_injected(e);
+    local display_mode = injected and 29 or chat_display_mode(e);
     -- NPC dialog is emitted once in its original 150-152 modes, then
     -- reinjected for the legacy chat windows in mode 190. Capture the
     -- original event and ignore the reinjections so replacement windows do
@@ -1746,6 +1756,7 @@ local function append_message(e)
         time = os.date('%H:%M:%S'),
         mode = mode,
         display_mode = display_mode,
+        injected = injected,
         category = category,
         tell_peer = tell_peer_key,
         text = text,

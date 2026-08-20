@@ -31,12 +31,12 @@ window containing six tabs:
 
 Each window includes its own tab selection, search field, footer controls, and
 scroll state over the same bounded local chat buffer when those controls are
-enabled. It is passive UI: it only captures
-non-injected incoming chat text and renders it locally. Say, shout, yell, tell,
+enabled. It is passive UI: it captures incoming chat text and renders it
+locally. Say, shout, yell, tell,
 party, linkshell, assist, emote, system, and combat-style lines are colored from
-the closest known native chat mode colors. Injected addon/status output is left
-out of the replacement buffer so verbose addon configuration or status lines do
-not flood the chat tabs.
+the closest known native chat mode colors. Injected addon/status output remains
+available in System or All but is always omitted from tabs keyed `general` or
+the legacy `default`, so verbose logging does not flood the main chat view.
 
 Windows and tabs can be configured in game with `/ashitachat config`. The
 configuration window can add, remove, rename, reorder, apply, and save window
