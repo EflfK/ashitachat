@@ -99,6 +99,7 @@ $required = @(
     "message_matches_window(message, window)",
     "mark_matching_windows_scroll_to_bottom(message)",
     "message_color(display_mode, category)",
+    "imgui.TextUnformatted(text)",
     "ParseAutoTranslate(text, true)",
     "if (NATIVE_DIALOG_MODES[mode] ~= true)",
     "text:strip_colors():strip_translate(true)",
@@ -220,6 +221,10 @@ $forbidden = @(
     "/target ",
     "/attack "
 )
+
+if ($lua.Contains("imgui.TextColored(color, text);")) {
+    throw "Dynamic chat text must use TextUnformatted to avoid ImGui format-string crashes."
+}
 
 foreach ($needle in $forbidden) {
     if ($lua.Contains($needle)) {

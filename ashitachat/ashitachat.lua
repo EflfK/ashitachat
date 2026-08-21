@@ -1,6 +1,6 @@
 addon.name = 'ashitachat';
 addon.author = 'EflfK';
-addon.version = '0.1.26';
+addon.version = '0.1.27';
 addon.desc = 'Experimental local chat UI replacement trial for Ashita v4.';
 
 require('common');
@@ -1955,7 +1955,14 @@ local function text_colored_wrapped(color, text)
         imgui.PushTextWrapPos(0.0);
     end
 
-    imgui.TextColored(color, text);
+    -- Chat text is untrusted display content and can contain literal '%'
+    -- sequences. TextColored treats its text argument as a printf-style
+    -- format string in Ashita's ImGui binding, which can read nonexistent
+    -- varargs and crash the entire addons plugin. Apply the color through the
+    -- style stack and render the message without format-string interpretation.
+    imgui.PushStyleColor(IMGUI.col_text, color);
+    imgui.TextUnformatted(text);
+    imgui.PopStyleColor();
 
     if (wrapped) then
         imgui.PopTextWrapPos();
